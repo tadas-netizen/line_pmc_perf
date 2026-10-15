@@ -139,6 +139,7 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
   <h1>pmc-line perf runner</h1>
   <div class="seg" id="targets" role="group" aria-label="Target"></div>
   <span class="note" id="baseUrl"></span>
+  <input type="text" id="customBase" hidden placeholder="https://…  (custom base URL)" style="width:320px;max-width:60vw" autocomplete="off" spellcheck="false">
   <div class="seg" id="lang" role="group" aria-label="Language" style="margin-left:auto"><button type="button" data-lang="en">EN</button><button type="button" data-lang="th">TH</button></div>
 </div>
 <div class="banner warn" id="targetNote" hidden></div>
@@ -413,6 +414,7 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     'products.image needs PERF_IMAGE_FILE_ID (a QR / product file id) in .env or .env.{t}': 'products.image ต้องมี PERF_IMAGE_FILE_ID (file id ของ QR / รูปสินค้า) ใน .env หรือ .env.{t}',
     'needs no admin account (public endpoints only)': 'ไม่ต้องใช้บัญชี admin (เส้นสาธารณะอย่างเดียว)', 'host not set: put PERF_{T}_BASE in .env.{t}': 'ยังไม่ได้ตั้ง host: ใส่ PERF_{T}_BASE ใน .env.{t}',
     'the spec\'s five "List Load Test" lines: orders 10 · products 50 · admin orders 50 · dashboard 50 · admin products 10 TPS': '5 เส้นหลักตามเอกสาร List Load Test: สั่งซื้อ 10 · products 50 · admin orders 50 · dashboard 50 · admin products 10 TPS',
+    'custom URL: type the base, e.g. https://line-order-preview.vercel.app': 'custom URL: พิมพ์ base เช่น https://line-order-preview.vercel.app',
     'no cookie': 'ไม่ใช้ cookie', 'admin (PERF_ADMIN_ROLE)': 'admin (ตาม PERF_ADMIN_ROLE)', ' · writes per request': ' · เขียนทุก request', ' · fills an in-memory cache, writes nothing': ' · เติม cache ในหน่วยความจำ ไม่เขียนอะไร',
     'missing → "prepare now" runs: {f}': 'ยังไม่มี → "เตรียมให้ตอนนี้" จะรัน: {f}',
     'local pmc-line: what this run needs': 'local pmc-line: สิ่งที่รอบนี้ต้องมี',
@@ -432,8 +434,11 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
   // ---------- form ----------
   function fieldsOf(c) { return META.cases[c].fields; }
   function val(k) { var f = fieldsOf(caseId).filter(function (x) { return x.key === k; })[0]; var v = values[caseId] && values[caseId][k]; return v != null ? v : f ? f.default : ''; }
-  // stg / prod carry a word to type (the human-error guard); mock and local do not
-  function typedTarget(k) { var x = META && META.targets[k || target]; return !!(x && x.word); }
+  // stg / prod carry a word to type (the human-error guard); mock and local do not; custom: only on a remote host
+  function customBase() { var el = $('customBase'); return el ? el.value.trim().replace(/\/+$/, '') : ''; }
+  function isLocalUrl(u) { var h = String(u || '').replace(/^[a-z]+:\/\//i, '').split('/')[0].split(':')[0].toLowerCase(); return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0'; }
+  function baseOf(k) { k = k || target; return k === 'custom' ? customBase() : ((META.targets[k] || {}).base || ''); }
+  function typedTarget(k) { var x = META && META.targets[k || target]; if (!x) return false; if (x.custom) return !!customBase() && !isLocalUrl(customBase()); return !!x.word; }
   function renderTargets() {
     $('targets').innerHTML = Object.keys(META.targets).map(function (k) {
       var t = META.targets[k];
@@ -441,7 +446,9 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     }).join('');
     var t = META.targets[target];
     loadLocal();
-    $('baseUrl').textContent = t.base;
+    $('customBase').hidden = !t.custom;
+    if (t.custom && !$('customBase').value) $('customBase').value = t.base || '';
+    $('baseUrl').textContent = t.custom ? '' : t.base;
     $('targetNote').hidden = false;
     $('targetNote').textContent = (LANG === 'th' && t.noteTh ? t.noteTh : t.note) + (t.ok ? '' : t2(' — not configured: fill .env from .env.example'));
   }
@@ -616,7 +623,7 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     var e = envNow(), est = estimate(e), c = META.cases[caseId], n = needs(e), D = (META.data || {})[target] || {}, mock = target === 'mock';
     var warn = [], bad = [], info = [];
     var busy = lastInfo && !lastInfo.done, real = typedTarget() && $('real').checked, announced = $('announced').checked;
-    var lines = [t('Target <b>{t}</b> · scenario <b>{c}</b>', { t: esc(META.targets[target].label), c: esc(c.label) }),
+    var lines = [t('Target <b>{t}</b> · scenario <b>{c}</b>', { t: esc(META.targets[target].label) + (target === 'custom' && customBase() ? ' ' + esc(customBase()) : ''), c: esc(c.label) }),
       '≈ <b>' + dur(est) + '</b>' + (caseId === 'stress' ? t(' at most (stops at the first failing step)') : '') +
         (n.req != null ? t(' · ≈ <b>{n}</b> requests', { n: fmt(n.req) }) : c.steady ? t(' · request count depends on the server (VU-based)') : '') + (n.peak ? t(' · peak ≈ <b>{n}</b> TPS', { n: num(n.peak) }) : ''),
       c.steady ? t('PASS/FAIL over the whole run (ramp up + hold + ramp down): p95 ≤ {p} ms and errors &lt; {e} %', { p: META.gate.p95, e: META.gate.errPct }) : caseId === 'check' ? t('PASS per endpoint: at least one request ran and none answered an unexpected status (latency shown, not gated)') : t('Strict: every check must pass')];
@@ -624,13 +631,14 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     if (n.orders >= 1) info.push(t('creates ≈ {n} real orders (+ a slip file each in GCS)', { n: fmt(n.orders) }));
     if (n.writes >= 1) info.push(t('≈ {n} write requests: documents created / changed (README "What a run leaves behind")', { n: fmt(n.writes) }));
     var need = needsOf(caseId, e), C = META.targets[target].creds || {};
-    if (!mock) {
+    if (!mock && !(target === 'custom' && isLocalUrl(customBase()))) { // a localhost custom URL falls back to the seed's accounts (lib/config.js)
       if (need.super && !C.super) bad.push(t('this run signs in as SUPER_ADMIN: set PERF_ADMIN_USER + PERF_ADMIN_PASS in .env or .env.{t}', { t: target }));
       if (need.partner && !C.partner) bad.push(t('this run signs in as PARTNER_ADMIN: set PERF_PARTNER_USER + PERF_PARTNER_PASS in .env or .env.{t}', { t: target }));
       if (need.imageId && !C.imageId) bad.push(t('products.image needs PERF_IMAGE_FILE_ID (a QR / product file id) in .env or .env.{t}', { t: target }));
       if (!need.super && !need.partner) info.push(t('needs no admin account (public endpoints only)'));
       if (typedTarget() && /not set/.test(META.targets[target].base || '')) bad.push(t('host not set: put PERF_{T}_BASE in .env.{t}', { T: target.toUpperCase(), t: target }));
     }
+    if (target === 'custom' && !/^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~\/-]*)?$/.test(customBase())) bad.push(t('custom URL: type the base, e.g. https://line-order-preview.vercel.app'));
     if (isList() && !e.ENDPOINTS) bad.push(t('tick at least one endpoint'));
     if (caseId === 'tsall' && e.TSALL_TS01 === '0' && e.TSALL_TS02 === '0' && e.TSALL_TS03 === '0' && e.TSALL_TS04 === '0') bad.push(t('nothing selected'));
     if (caseId === 'tsall') info.push(t('runs one TS at a time, each with its own defaults; you can close this page — the run continues'));
@@ -640,17 +648,19 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
       warn.map(function (x) { return '<div class="warn">⚠ ' + x + '</div>'; }).join('') + bad.map(function (x) { return '<div class="bad">⛔ ' + x + '</div>'; }).join('');
     // announce-before-run (stg / prod)
     $('realBox').hidden = !typedTarget(); $('realMore').hidden = !real;
-    if (real) $('advMsg').textContent = t('Heads-up: perf test · {when} · {t} ({base})', { when: nowStamp(), t: META.targets[target].label, base: META.targets[target].base }) + '\n' +
+    if (real) $('advMsg').textContent = t('Heads-up: perf test · {when} · {t} ({base})', { when: nowStamp(), t: META.targets[target].label, base: baseOf() }) + '\n' +
       summaryOf({ case: caseId, env: e }) + '\n≈ ' + dur(est) + (n.req != null ? t(' · ≈ {n} requests', { n: fmt(n.req) }) : '') + (n.peak ? t(' · peak ≈ {n} TPS', { n: num(n.peak) }) : '') + '\n' +
       t('Dev / Platform: please stand by and watch Vercel function duration / errors, Firestore reads & writes and GCS.');
     var cmdEnv = Object.keys(e).map(function (k) { return k + '=' + e[k]; });
     $('cmd').textContent = cmdEnv.concat([caseId === 'ts01q' ? 'scripts/ts01-queue.sh ' + (e.ENDPOINTS || '') : caseId === 'check' ? 'k6 run scenarios/check.js' : caseId === 'tsall' ? 'scripts/ts-all.sh' : 'k6 run ' + c.label]).join(' \\\n  ');
     $('runBtn').disabled = bad.length > 0;
     $('runBtn').textContent = !typedTarget() ? t('Run') : t('Run on {t}…', { t: META.targets[target].label });
+    $('customBase').hidden = target !== 'custom';
     drawCalc();
   }
   function nowStamp() { var d = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return (LANG === 'th' ? ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])[d.getDay()] + ' ' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
   $('real').addEventListener('change', update); $('announced').addEventListener('change', update);
+  $('customBase').addEventListener('input', function () { if (META) update(); });
 
   // ---------- typed confirmation (human-error guard for stg / prod) ----------
   var modalCb = null;
@@ -659,8 +669,8 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     $('modal').className = 'modal' + (t === 'stg' ? ' stg' : '');
     $('mTitle').textContent = t2(intent === 'select' ? 'Switch target to {t}?' : 'Run on {t}?', { t: label });
     $('mBody').innerHTML = intent === 'select'
-      ? t2('Runs from now on will send real load to <b>{base}</b>. You will be asked again before every run.', { base: esc(META.targets[t].base) })
-      : t2('About to start <b>{c}</b> against <b>{base}</b> for about <b>{d}</b>.', { c: esc(META.cases[caseId].label), base: esc(META.targets[t].base), d: dur(estimate(envNow())) });
+      ? t2('Runs from now on will send real load to <b>{base}</b>. You will be asked again before every run.', { base: esc(baseOf(t)) })
+      : t2('About to start <b>{c}</b> against <b>{base}</b> for about <b>{d}</b>.', { c: esc(META.cases[caseId].label), base: esc(baseOf(t)), d: dur(estimate(envNow())) });
     $('mWord').textContent = word; $('mInput').value = ''; $('mOk').disabled = true; $('mList').hidden = false;
     modalCb = cb; $('modal').hidden = false; setTimeout(function () { $('mInput').focus(); }, 0);
   }
@@ -691,7 +701,7 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
   }
   function start(confirmText) {
     var e = envNow();
-    var body = { case: caseId, target: target, env: e, confirmText: confirmText, estimateSec: estimate(e), real: typedTarget() && $('real').checked, announced: $('announced').checked };
+    var body = { case: caseId, target: target, env: e, confirmText: confirmText, estimateSec: estimate(e), real: typedTarget() && $('real').checked, announced: $('announced').checked, baseUrl: target === 'custom' ? customBase() : undefined };
     api('/api/run', body).then(function (info) {
       LIVE = []; liveLen = 0; liveTotal = null; liveFails = []; liveErrs = []; liveErrsMin = []; logLen = 0; $('log').textContent = ''; sheetShownFor = null;
       lastInfo = info; exitView(); poll();
@@ -1196,7 +1206,7 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
     var t = e.target.closest('[data-t]'), c = e.target.closest('[data-c]'), v = e.target.closest('[data-view]'), sh = e.target.closest('[data-sheet]'), hf = e.target.closest('[data-hf]');
     if (t && t.dataset.t !== target) {
       var nt = t.dataset.t;
-      if (!META.targets[nt].word) { target = nt; renderTargets(); loadLastPass(); update(); } // mock / local: nothing to confirm
+      if (!META.targets[nt].word || META.targets[nt].custom) { target = nt; renderTargets(); loadLastPass(); update(); } // mock / local / custom: nothing to confirm yet
       else { pendingTarget = nt; confirmTyped(nt, 'select', function () { target = nt; pendingTarget = null; renderTargets(); loadLastPass(); update(); }); }
     }
     if (c) { $('real').checked = !!META.cases[c.dataset.c].steady; $('announced').checked = false; caseId = c.dataset.c; history.replaceState(null, '', '#' + caseId); renderTabs(); renderForm(); update(); drawHistory(); loadLocal(); }

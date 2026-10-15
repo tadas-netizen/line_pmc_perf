@@ -37,6 +37,7 @@ every script refuses to start, so a forgotten variable can never send load anywh
 | **local** | `PERF_TARGET=local PERF_BASE=http://localhost:3100 k6 run …` or the runner's "local pmc-line" | pmc-line on this machine, booted by `scripts/local-stack.sh up` the way its own `tests/load/run.sh` does: throwaway Firestore + fake-GCS emulators on 8085 / 4448 (in memory, never the dev stack's 8080 / 4443), the perf seed (`PERF_ORDERS`, default 2,000; the emulator fits ≈ 20,000), a **production build** on :3100 (a dev build's compile latency would fake the numbers). `down` discards everything |
 | **stg** | `PERF_TARGET=stg PERF_CONFIRM=STAGING k6 run …`, or the runner's amber **STAGING** button | the host in `PERF_STG_BASE` (`.env.stg`) — **not stored in the repo** |
 | **prod** | `PERF_TARGET=prod PERF_CONFIRM=PRODUCTION k6 run …`, or the runner's red **PRODUCTION** button | the host in `PERF_PROD_BASE` (`.env.prod`) — **not stored in the repo** |
+| **custom** | `PERF_BASE=https://… PERF_CONFIRM=CUSTOM k6 run …`, or the runner's **custom URL** target (a base typed on the page) | any host: a preview deployment, the app on another port. A localhost URL needs no word; a remote one needs `CUSTOM`; the stg / prod hosts are refused here (use their own target). Accounts from `.env` |
 
 An explicit `PERF_BASE` overrides the preset. A base on the stg / prod host is guarded like the
 target; a base on any other remote host needs `PERF_CONFIRM=CUSTOM`.
@@ -232,7 +233,10 @@ python3 tools/runner.py            # or: npm run runner
 - **Live charts** from k6's raw output (`K6_OUT=json` into `results/_live/`): TPS vs target, p50 /
   p95 vs the gate, responses by status, hold shaded, KPIs, failed requests by tag + status, error
   detail + errors per minute. The per-second series is kept as `results/<run>_live.json` for replay.
-- **Endpoint checklist** (TS-01 Group Run / Check): quick picks reads / heavy / auth / writes /
+- **Partner** fields on every scenario: `PERF_PARTNER` (the one code used where a single partner is
+  needed) and `PERF_PARTNERS` (the list the storefront calls spread over) — the quickest way to point
+  a run at one storefront.
+- **Endpoint checklist** (TS-01 Group Run / Check): quick picks ★ focus / reads / heavy / auth / writes /
   **no DB write** / all / none, a TPS box per endpoint (placeholder = the endpoint's default from
   the spec's lines), what each call leaves in the DB, "use last passing rate" from this target's
   passing TS-01 runs.

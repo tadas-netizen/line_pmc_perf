@@ -19,6 +19,8 @@ One pass, no load. Strict: every check must pass and no request may fail — it 
 | **Sections** (`PERF_SMOKE_SECTIONS`) | all (the page pre-fills all; the script alone defaults to public,auth,neg,ts01) | Which parts to exercise: public = GET /api/products, POST /api/discount/validate, GET /api/product-image; auth = login as every configured role + logout; neg = no cookie → 401, viewer write → 403, out-of-scope partner → 403, inactive account → 401; ts01 = every TS-01 READ endpoint once; order = ONE real order with a slip; writes = every TS-01 WRITE endpoint once. Comma-separated, or `all`. |
 | **Print failures** (`PERF_DEBUG`) | on | On: every failed check prints the response status and body to the log (open 'k6 log' below the results). Turn off only for very noisy runs. Options: `1` = on, (empty) = off. |
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-All
 
@@ -38,6 +40,8 @@ A launcher, not a new load test: runs TS-01 Endpoint (Group Run) for all 36 endp
 | **Ramp down (every TS)** (`TSALL_RAMP_DOWN`) | 30s | The ramp down every TS uses (passed on as PERF_RAMP_DOWN). |
 | **Gap (s)** (`TSALL_GAP`) | 60 s | Seconds between the end of one TS and the start of the next, so one test's tail never overlaps the next one's measurement. (TS-01 keeps its own 60 s gap between endpoints.) |
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-01 Endpoint
 
@@ -53,6 +57,8 @@ Tests ONE endpoint on its own. Target mode: one rate, PASS/FAIL over the whole r
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-01 Endpoint (Group Run)
 
@@ -69,6 +75,8 @@ Runs TS-01 Endpoint for every ticked endpoint, one at a time, in list order. Qui
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## Check
 
@@ -82,6 +90,8 @@ Every ticked endpoint for a moment at its rate (default 5 TPS for 1 s), one afte
 | **Each for** (`PERF_HOLD`) | 1 s | How long each endpoint runs at its rate (k6 duration, e.g. 1s, 5s). Rate × this = requests per endpoint. |
 | **Gap (s)** (`CHECK_GAP`) | 1 s | Seconds between endpoints, so one endpoint's slow tail never reaches the next one. |
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-02 Storefront
 
@@ -96,6 +106,7 @@ Each iteration = one customer: GET /api/products?partner= → with probability P
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
 
 ## TS-03 Admin orders
 
@@ -113,6 +124,8 @@ Each iteration = one admin working the list: first page (limit 10) → status fi
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-04 Dashboard
 
@@ -128,6 +141,8 @@ Each iteration = one dashboard load: GET /api/admin/dashboard-stats (Firestore a
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## Soak
 
@@ -142,6 +157,8 @@ ONE request per iteration, drawn from the docs' priority lines by weight (PERF_M
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## Stress
 
@@ -156,6 +173,8 @@ Steps up the priority mix by +50 TPS (50, 100, … up to the top). Each step ram
 | **Ramp per step** (`PERF_RAMP`) | 30s | How long each step takes to climb to its rate; counts toward that step's window. |
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## Spike
 
@@ -169,6 +188,8 @@ Jumps from 0 to the peak in a few seconds (Vercel functions must scale out cold)
 | **Admin role** (`PERF_ADMIN_ROLE`) | super | The session the admin endpoints and journeys use: super = SUPER_ADMIN (sees every partner, no ?partner=); partner = PARTNER_ADMIN (scoped to its own partners, the `in` query; PERF_PARTNER names the one used where a single code is needed). Super-only endpoints (users, partners, QR upload) always use the SUPER_ADMIN account. Options: (empty) = super (SUPER_ADMIN), `partner` = partner (PARTNER_ADMIN, scoped). |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## Sign-in
 
@@ -180,6 +201,8 @@ Logins at a constant, low rate (default 2/s), alternating the configured account
 | **Ramp up** (`PERF_RAMP`) | 30s | How long the load takes to climb from zero to the target. Requests during the ramp COUNT toward PASS/FAIL (they are tagged stage=ramp-up for the charts). Formats: 30s, 2m, 1m30s. |
 | **Hold** (`PERF_HOLD`) | 5m | How long the load stays at the target. PASS/FAIL (p95 ≤ the gate, error rate < the gate; a response slower than the slow gate counts as an error) is measured over the whole run: ramp up + hold + ramp down (per ladder step: its ramp + hold). Longer holds weigh the ramps less and give steadier numbers, but create more data in write scenarios. |
 | **Ramp down** (`PERF_RAMP_DOWN`) | 30s | How long the load takes to wind down after the hold. These requests count toward PASS/FAIL too (stage=ramp-down). |
+| **Partner** (`PERF_PARTNER`) | the first partner with an orderable product | The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products. |
+| **Partners (storefront)** (`PERF_PARTNERS`) | every partner with an orderable product | Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test. |
 
 ## TS-01 endpoints
 

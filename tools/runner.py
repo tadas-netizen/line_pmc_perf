@@ -37,8 +37,10 @@ LOCAL_BASE = os.environ.get("LOCAL_BASE", "http://localhost:3100")
 
 # ---- Targets --------------------------------------------------------------------------
 
-CONFIRM_WORD = {"stg": "STAGING", "prod": "PRODUCTION"}  # must match lib/config.js
-TARGET_LABEL = {"mock": "local (mock)", "local": "local pmc-line", "stg": "STAGING", "prod": "PRODUCTION"}
+CONFIRM_WORD = {"stg": "STAGING", "prod": "PRODUCTION", "custom": "CUSTOM"}  # must match lib/config.js
+CUSTOM_FILE = os.path.join(RESULTS, "_custom_base.txt")  # the last custom URL, so the page pre-fills it
+CUSTOM_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:\d{1,5})?(/[A-Za-z0-9._~/-]*)?$")
+TARGET_LABEL = {"mock": "local (mock)", "local": "local pmc-line", "stg": "STAGING", "prod": "PRODUCTION", "custom": "custom URL"}
 # the mock's seed accounts (scripts/mock_line.py) = the emulator seed's (docs §1.2)
 MOCK_ACCOUNTS = {"PERF_ADMIN_USER": "perfadmin01", "PERF_ADMIN_PASS": "perf-pass", "PERF_PARTNER_USER": "perfuser02", "PERF_PARTNER_PASS": "perf-pass",
                  "PERF_VIEWER_USER": "perfuser03", "PERF_VIEWER_PASS": "perf-pass", "PERF_INACTIVE_USER": "inactiveuser", "PERF_INACTIVE_PASS": "inactive-pass-1",
@@ -78,8 +80,26 @@ def target_env(target):
         env = dict(read_dotenv("local"), PERF_TARGET="local", PERF_TARGET_LABEL="local pmc-line")
         env.pop("PERF_STG_BASE", None); env.pop("PERF_PROD_BASE", None)
         return env
+    if target == "custom":
+        return dict(read_dotenv(), PERF_TARGET_LABEL="custom")  # PERF_BASE comes from the page per run
     env = dict(read_dotenv(target), PERF_TARGET=target)
     return env
+
+
+def host_of(url):
+    return re.sub(r"^[a-z]+://", "", url or "").split("/")[0].split(":")[0].lower()
+
+
+def is_local_host(h):
+    return h in ("127.0.0.1", "localhost", "0.0.0.0", "[::1]")
+
+
+def last_custom_base():
+    try:
+        with open(CUSTOM_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 def creds_of(env):
@@ -114,6 +134,11 @@ def target_meta():
                            f"host in .env.{t} as PERF_{t.upper()}_BASE, dedicated perf accounts as PERF_ADMIN_* / PERF_PARTNER_* / PERF_VIEWER_* · "
                            f"type {CONFIRM_WORD[t]} to select it and again for every run"),
                   "noteTh": runner_th.note(t, base, CONFIRM_WORD[t])}
+    c = creds_of(read_dotenv())
+    out["custom"] = {"label": TARGET_LABEL["custom"], "base": last_custom_base(), "ok": True, "word": CONFIRM_WORD["custom"], "custom": True, "creds": c,
+                     "note": "any base URL typed on the page (e.g. a preview deployment, or the app on another port) · accounts from .env (PERF_ADMIN_* …) · "
+                             "a localhost URL runs at once; any other host needs CUSTOM typed for every run; the STAGING / PRODUCTION hosts must use their own target",
+                     "noteTh": runner_th.CUSTOM_NOTE}
     return out
 
 
@@ -382,6 +407,17 @@ CASES = {
                    "logins per second — keep it low",
                    "Logins started per second. More than 5 saturates the function's CPU by design.")] + SHAPE},
 }
+PARTNER = [
+    F("PERF_PARTNER", "Partner", "", "the first partner with an orderable product",
+      "the one partner code used where a single code is needed",
+      "The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products."),
+    F("PERF_PARTNERS", "Partners (storefront)", "", "every partner with an orderable product",
+      "comma list of partner codes the storefront calls spread over",
+      "Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test."),
+]
+for _c in CASES.values():
+    _have = {f["key"] for f in _c["fields"]}
+    _c["fields"] = _c["fields"] + [f for f in PARTNER if f["key"] not in _have]
 VALUE_RE = re.compile(r"^[A-Za-z0-9_.:,/\-]{0,200}$")
 LONG_VALUE_RE = re.compile(r"^[A-Za-z0-9_.:,\-]{0,4000}$")  # endpoint lists / per-endpoint rates
 LONG_KEYS = ("ENDPOINTS", "TS01_RATES")
@@ -714,7 +750,7 @@ def history():
     items = sorted(runs.values(), key=lambda x: -x["mtime"])[:200]
     for it in items:
         it["time"] = time.strftime("%Y-%m-%d %H:%M", time.localtime(it["mtime"]))
-        m = re.match(r"^(?:mock|local|stg|prod)-([a-z0-9]+)-\d{4}-\d{6}$", it["runId"])  # runner run ids: <target>-<case>-<mmdd-hhmmss>
+        m = re.match(r"^(?:mock|local|stg|prod|custom)-([a-z0-9]+)-\d{4}-\d{6}$", it["runId"])  # runner run ids: <target>-<case>-<mmdd-hhmmss>
         it["case"] = m.group(1) if m and m.group(1) in CASES else ""
         lv = os.path.join(RESULTS, f"{it['runId']}_live.json")
         if os.path.exists(lv):
@@ -1003,9 +1039,20 @@ def start_run(body):
     case, target = body.get("case"), body.get("target")
     if case not in CASES:
         raise ValueError(f"unknown scenario {case}")
-    if target not in ("mock", "local", "stg", "prod"):
+    if target not in ("mock", "local", "stg", "prod", "custom"):
         raise ValueError(f"unknown target {target}")
-    if target in CONFIRM_WORD and body.get("confirmText") != CONFIRM_WORD[target]:
+    custom_base = ""
+    if target == "custom":
+        custom_base = str(body.get("baseUrl") or "").strip().rstrip("/")
+        if not CUSTOM_RE.match(custom_base):
+            raise ValueError("custom URL: http(s)://host[:port][/path], e.g. https://line-order-preview.vercel.app")
+        h = host_of(custom_base)
+        for t in ("stg", "prod"):
+            if preset_base(t) and host_of(preset_base(t)) == h:
+                raise ValueError(f"{custom_base} is the {TARGET_LABEL[t]} host — pick the {TARGET_LABEL[t]} target (its own typed word)")
+        if not is_local_host(h) and body.get("confirmText") != CONFIRM_WORD["custom"]:
+            raise ValueError(f"custom URL on a remote host: type {CONFIRM_WORD['custom']} to confirm this run")
+    elif target in CONFIRM_WORD and body.get("confirmText") != CONFIRM_WORD[target]:
         raise ValueError(f"{TARGET_LABEL[target]}: type {CONFIRM_WORD[target]} to confirm this run (scheduled, team informed)")
     c = CASES[case]
     allowed = {f["key"] for f in c["fields"]}
@@ -1037,12 +1084,17 @@ def start_run(body):
     for k in ("TSALL_TS01_TPS", "TSALL_TS01_AUTH_TPS", "TSALL_TS01_WRITE_TPS", "PERF_RPS", "PERF_ORDERS_PER_SEC", "PERF_TARGET_RPS", "PERF_STRESS_MAX", "PERF_STRESS_STEP", "PERF_SPIKE_RPS", "PERF_LOGINS_PER_SEC"):
         if env.get(k) and (not re.match(r"^\d+$", env[k]) or int(env[k]) <= 0):
             raise ValueError(f"{k}: a whole number of TPS, e.g. 50")
+    for k in ("PERF_PARTNER", "PERF_PARTNERS"):
+        if env.get(k) and not re.match(r"^[A-Za-z0-9_-]{1,40}(,[A-Za-z0-9_-]{1,40})*$", env[k]):
+            raise ValueError(f"{k}: partner codes (A-Z 0-9 _ -), comma-separated")
+    if env.get("PERF_PARTNER") and "," in env["PERF_PARTNER"]:
+        raise ValueError("PERF_PARTNER: one code (PERF_PARTNERS takes the list)")
     for k in ("PERF_P_VALIDATE", "PERF_P_SLIP", "PERF_P_NOTE", "PERF_P_STATUS", "PERF_P_RANGE"):
         if env.get(k) and not re.match(r"^(0(\.\d+)?|1(\.0+)?)$", env[k]):
             raise ValueError(f"{k}: a probability 0–1, e.g. 0.3")
     if env.get("PERF_MIX") and not re.match(r"^(order|products|orders|dashboard|catalog):\d+(,(order|products|orders|dashboard|catalog):\d+)*$", env["PERF_MIX"]):
         raise ValueError("PERF_MIX: name:weight pairs, e.g. order:10,products:50,orders:50,dashboard:50,catalog:10")
-    real = bool(body.get("real")) and target in CONFIRM_WORD  # local / mock runs never go to the results sheet
+    real = bool(body.get("real")) and target in ("stg", "prod", "custom")  # local / mock runs never go to the results sheet
     if real and not body.get("announced"):
         raise ValueError("real run: tick \"Announced in the team chat\" first")
     run_id = RUN_ID_RE.sub("", body.get("runId") or "") or f"{target}-{case}-{time.strftime('%m%d-%H%M%S')}"
@@ -1057,13 +1109,23 @@ def start_run(body):
             raise ValueError(f"{target}: set PERF_{target.upper()}_BASE (the app's URL) in .env.{target}")
         if target != "mock":
             need, c_ok = requirements(case, env), creds_of(base)
-            if target == "local" and not any(c_ok[r] for r in ("super", "partner", "viewer")):
+            local_like = target == "local" or (target == "custom" and is_local_host(host_of(custom_base)))
+            if local_like and not any(c_ok[r] for r in ("super", "partner", "viewer")):
                 c_ok = {"super": True, "partner": True, "viewer": True, "imageId": c_ok["imageId"]}  # the seed's defaults (lib/config.js)
             for role, var in (("super", "PERF_ADMIN_USER + PERF_ADMIN_PASS (a SUPER_ADMIN)"), ("partner", "PERF_PARTNER_USER + PERF_PARTNER_PASS (a PARTNER_ADMIN)"), ("viewer", "PERF_VIEWER_USER + PERF_VIEWER_PASS")):
                 if role in need and not c_ok[role]:
                     raise ValueError(f"{target}: this run signs in as {role} — set {var} in .env or .env.{target}")
             if "imageId" in need and not c_ok["imageId"]:
                 raise ValueError(f"{target}: products.image needs PERF_IMAGE_FILE_ID (a QR / product file id) in .env.{target}")
+        if target == "custom":
+            base["PERF_BASE"] = custom_base
+            if not is_local_host(host_of(custom_base)):
+                base["PERF_CONFIRM"] = CONFIRM_WORD["custom"]  # typed on the page for this run
+            try:
+                with open(CUSTOM_FILE, "w", encoding="utf-8") as f:
+                    f.write(custom_base)
+            except OSError:
+                pass
         if target == "mock":
             ensure_mock()
         if target == "local":
@@ -1225,7 +1287,7 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, prep_status(int(q1(u, "from") or 0)))
         if u.path == "/api/lastpass":
             t = q1(u, "target")
-            return self.send(200, last_pass(t) if t in ("mock", "local", "stg", "prod") else {})
+            return self.send(200, last_pass(t) if t in ("mock", "local", "stg", "prod", "custom") else {})
         if u.path == "/api/status":
             frm = int(q1(u, "from") or 0)
             with RUN.lock:

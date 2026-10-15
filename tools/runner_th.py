@@ -85,6 +85,10 @@ FIELDS = {
     "PERF_STRESS_HOLD": {"label": "แช่ต่อขั้น", "hint": "เวลาที่แต่ละขั้นคง rate (วัดรวม ramp ของขั้น)", "info": "แต่ละขั้นแช่นานเท่านี้และตัดสินจากช่วงของขั้นนั้นเอง (ramp + แช่)"},
     "PERF_SPIKE_RPS": {"label": "Peak (TPS)", "dflt": "340 TPS (2 เท่าของ mix)", "hint": "rate ที่จะกระโดดไป", "info": "TPS สูงสุด (1 request ต่อ iteration)"},
     "PERF_SPIKE_RAMP": {"label": "กระโดด", "hint": "0 → peak เร็วแค่ไหน", "info": "เวลากระโดด สั้น = spike แรง"},
+    "PERF_PARTNER": {"label": "พาร์ทเนอร์", "dflt": "ร้านแรกที่มีสินค้าสั่งได้", "hint": "รหัสร้านเดียวที่ใช้เมื่อต้องระบุร้าน",
+                     "info": "รหัสร้านที่ใช้เมื่อต้องระบุร้านเดียว: GET /api/admin/products?partner=, fixture ของโค้ดส่วนลด, ?partner= ตอน role เป็น partner, การอัปโหลดรูป ว่าง = ร้านแรกที่มีสินค้า active และไม่หมดใน GET /api/products"},
+    "PERF_PARTNERS": {"label": "พาร์ทเนอร์ (หน้าร้าน)", "dflt": "ทุกร้านที่มีสินค้าสั่งได้", "hint": "รายการรหัสร้านคั่นด้วย , ที่เส้นหน้าร้านจะวนใช้",
+                      "info": "จำกัดเส้นหน้าร้าน (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, mix, เส้น public ของ TS-01) ไว้ที่รหัสร้านเหล่านี้ (คั่นด้วย ,) ว่าง = ทุกร้านที่มีสินค้า active และไม่หมด ร้านเดียว = counter เดียว = ทดสอบ contention"},
     "PERF_LOGINS_PER_SEC": {"label": "Login/วิ", "hint": "login ต่อวินาที — ให้ต่ำไว้", "info": "login ที่เริ่มต่อวินาที เกิน 5 จะกิน CPU ของ function จนเต็มโดยธรรมชาติ"},
 }
 
@@ -131,6 +135,7 @@ def note(target, base, word):
             f"พิมพ์ {word} เพื่อเลือก และพิมพ์อีกครั้งทุกรอบที่ยิง")
 
 
+CUSTOM_NOTE = "base URL ใดก็ได้ที่พิมพ์บนหน้านี้ (เช่น preview deployment หรือแอปบนพอร์ตอื่น) · บัญชีจาก .env (PERF_ADMIN_* …) · URL localhost ยิงได้เลย host อื่นต้องพิมพ์ CUSTOM ทุกรอบ · host ของ STAGING / PRODUCTION ต้องใช้ target ของมันเอง"
 MOCK_NOTE = "scripts/mock_line.py (ทุกเส้นตาม docs/api-spec-loadtest.md ออเดอร์ปลอม 2,000 ใบ) — พิสูจน์สคริปต์ ไม่ใช่ performance"
 LOCAL_NOTE = "pmc-line dev server ในเครื่องนี้ (pnpm dev + Firestore / GCS emulator) · บัญชี = ชุด seed ของ emulator (pnpm seed:users) เว้นแต่ .env.local ระบุ · พิสูจน์สคริปต์และข้อมูลครบวงจรในเครื่องเดียว ไม่ใช่ performance"
 
