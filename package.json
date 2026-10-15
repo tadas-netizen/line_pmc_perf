@@ -1,0 +1,32 @@
+{
+  "name": "pmc-line-perf",
+  "private": true,
+  "description": "k6 performance tests for pmc-line (LINE OA storefront + admin portal) — API spec: docs/api-spec-loadtest.md",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "inspect": "for f in scenarios/*.js; do k6 inspect -e PERF_BASE=http://127.0.0.1:9 -e PERF_ENDPOINT=admin.orders.list -e ENDPOINTS=products.list,admin.dashboard \"$f\" >/dev/null && echo \"ok  $f\" || exit 1; done",
+    "dry-run": "scripts/dry-run.sh",
+    "runner": "python3 tools/runner.py",
+    "local:up": "scripts/local-stack.sh up",
+    "local:down": "scripts/local-stack.sh down",
+    "smoke": "PERF_DEBUG=1 k6 run scenarios/smoke.js",
+    "smoke:all": "PERF_DEBUG=1 PERF_SMOKE_SECTIONS=all k6 run scenarios/smoke.js",
+    "check": "k6 run scenarios/check.js",
+    "ts01": "k6 run scenarios/ts01-endpoint.js",
+    "ts01:focus": "scripts/ts01-queue.sh focus",
+    "ts01:reads": "scripts/ts01-queue.sh reads",
+    "ts02": "k6 run scenarios/ts02-storefront.js",
+    "ts03": "k6 run scenarios/ts03-admin-orders.js",
+    "ts04": "k6 run scenarios/ts04-dashboard.js",
+    "ts-all": "scripts/ts-all.sh",
+    "auth": "k6 run scenarios/auth.js",
+    "soak": "k6 run scenarios/soak.js",
+    "spike": "k6 run scenarios/spike.js",
+    "stress": "k6 run scenarios/stress.js",
+    "rollup": "node scripts/rollup.ts results",
+    "settings-md": "python3 tools/runner.py --settings-md > docs/runner-settings.md"
+  }
+}

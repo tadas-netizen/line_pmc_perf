@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pmc-line perf runner</title>
+<style>
+:root{--bg:#f6f6f3;--card:#fff;--fg:#1d1d1b;--muted:#6b6b66;--line:#e4e3de;--hover:#f1f0ec;--accent:#3a6fb0;--accent-fg:#fff;
+--pass:#1f7a4d;--pass-bg:#e3f3ea;--fail:#b3261e;--fail-bg:#fbe7e5;--warn:#8a5a00;--warn-bg:#fdf1d8;--code:#f1f0ec;
+--c1:#3a6fb0;--c2:#9aa6b5;--c-gate:#b3261e;--steady:rgba(58,111,176,.07);--s2:#3f9b6b;--s3:#9aa6b5;--s4:#d99a1e;--s5:#c8423a;--s0:#8d8d86}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#161615;--card:#1f1f1d;--fg:#ececea;--muted:#a3a39d;--line:#33332f;
+--hover:#262624;--accent:#7fa8e0;--accent-fg:#10151c;--pass:#6fd19f;--pass-bg:#18321f;--fail:#ff8a80;--fail-bg:#3a1a18;--warn:#f3c26b;--warn-bg:#352a12;--code:#262624;
+--c1:#7fa8e0;--c2:#6c7684;--c-gate:#ff8a80;--steady:rgba(127,168,224,.09);--s2:#5cc08c;--s3:#6c7684;--s4:#f0b545;--s5:#ff7b70;--s0:#8d8d86}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#161615;--card:#1f1f1d;--fg:#ececea;--muted:#a3a39d;--line:#33332f;
+--hover:#262624;--accent:#7fa8e0;--accent-fg:#10151c;--pass:#6fd19f;--pass-bg:#18321f;--fail:#ff8a80;--fail-bg:#3a1a18;--warn:#f3c26b;--warn-bg:#352a12;--code:#262624;
+--c1:#7fa8e0;--c2:#6c7684;--c-gate:#ff8a80;--steady:rgba(127,168,224,.09);--s2:#5cc08c;--s3:#6c7684;--s4:#f0b545;--s5:#ff7b70;--s0:#8d8d86}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Thai",Tahoma,sans-serif}
+main{max-width:1440px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:18px;margin:0}h2{font-size:15px;margin:0}h3{font-size:12px;margin:16px 0 6px;color:var(--muted);font-weight:600}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.seg button{font:inherit;font-size:13px;border:0;background:none;color:var(--fg);padding:5px 12px;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);font-weight:600}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+.seg button[data-t="prod"][aria-pressed="true"]{background:var(--fail);color:#fff}
+.seg button[data-t="stg"][aria-pressed="true"]{background:var(--warn);color:#fff}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:10;padding:16px}
+.modal .box{background:var(--card);border:2px solid var(--fail);border-radius:12px;max-width:520px;width:100%;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.modal.stg .box{border-color:var(--warn)}
+.modal h2{font-size:17px;margin:0 0 8px;color:var(--fail)}.modal.stg h2{color:var(--warn)}
+.modal ul{margin:8px 0 12px;padding-left:20px;font-size:13px}.modal li{margin:3px 0}
+.modal .word{font:600 15px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.5px}
+.modal input{font:600 16px ui-monospace,SFMono-Regular,Menlo,monospace;width:100%;max-width:none;padding:8px 10px;margin-top:6px;letter-spacing:1px}
+.modal .row{display:flex;gap:8px;margin-top:14px}.modal .row button{flex:1}
+button.danger{background:var(--fail);border:1px solid var(--fail);color:#fff;font-weight:600}.modal.stg button.danger{background:var(--warn);border-color:var(--warn)}
+button.danger:disabled{opacity:.35;cursor:not-allowed}
+.note{font-size:12px;color:var(--muted)}
+.banner{padding:7px 12px;border-radius:8px;font-size:13px;margin-bottom:12px}.banner.warn{background:var(--warn-bg);color:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.step{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px;font-weight:600}
+.step .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-size:11px}
+.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:3px 11px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+.desc{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.field{display:grid;grid-template-columns:130px 1fr;gap:2px 10px;align-items:center;margin:7px 0}
+.field label{font-size:13px}.field .help{grid-column:2;font-size:11.5px;color:var(--muted)}
+@media (max-width:520px){.field{grid-template-columns:1fr}.field .help{grid-column:1}}
+input[type=text],select{font:inherit;font-size:13px;width:100%;max-width:240px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.badge{font-size:10.5px;padding:0 6px;border-radius:4px;white-space:nowrap;margin-left:6px}
+.badge.read{background:var(--pass-bg);color:var(--pass)}.badge.auth{background:var(--code);color:var(--fg)}.badge.write{background:var(--fail-bg);color:var(--fail)}
+.plan{background:var(--hover);border-radius:8px;padding:10px 12px;font-size:13px}.plan b{font-variant-numeric:tabular-nums}
+.confirm{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin:10px 0 0;padding:8px 10px;border:1px dashed var(--fail);border-radius:8px;color:var(--fail);cursor:pointer}
+.confirm.ok{border-style:solid;border-color:var(--pass);color:var(--pass);background:var(--pass-bg)}
+pre{margin:0;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all;background:var(--code);border-radius:6px;padding:8px 10px}
+details{margin-top:10px}summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:2px 0}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+button.primary,button.ghost{font:inherit;font-size:14px;border-radius:8px;padding:7px 20px;cursor:pointer}
+button.primary{background:var(--accent);border:1px solid var(--accent);color:var(--accent-fg);font-weight:600;flex:1}
+button.primary:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:var(--card);border:1px solid var(--line);color:var(--fg)}button.ghost.danger{color:var(--fail);border-color:var(--fail)}
+button.mini{font:inherit;font-size:12px;padding:1px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg);cursor:pointer}
+.err{color:var(--fail);font-size:13px;margin-top:8px}
+.field .dflt{grid-column:2;font-size:11.5px;color:var(--muted)}.field .dflt b{color:var(--fg);font-weight:600}
+@media (max-width:520px){.field .dflt{grid-column:1}}
+.guide{font-size:12.5px;margin-top:6px}.guide p{margin:0 0 8px}.guide dl{margin:0}.guide dt{font-weight:600;margin-top:8px}
+.guide dt small{font-weight:400;color:var(--muted)}.guide dd{margin:2px 0 0;color:var(--muted)}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{display:inline-block;padding:1px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--hover);color:var(--muted)}
+.chip.run{background:var(--warn-bg);color:var(--warn)}.chip.pass{background:var(--pass-bg);color:var(--pass)}.chip.fail{background:var(--fail-bg);color:var(--fail)}
+.prog{height:4px;background:var(--hover);border-radius:2px;margin:10px 0 2px;overflow:hidden}.prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:12px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.kpi .l{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .v{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi.bad .v{color:var(--fail)}.kpi.good .v{color:var(--pass)}
+.charts{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.chart{border:1px solid var(--line);border-radius:8px;padding:8px 10px 4px;position:relative}
+.chart .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}.chart .hd b{font-size:12.5px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.legend i.dash{background:repeating-linear-gradient(90deg,currentColor 0 3px,transparent 3px 5px)!important;height:2px}
+.legend i.band{height:9px;width:12px;border:1px solid var(--line)}
+canvas{display:block;width:100%;height:150px}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:11.5px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.12);z-index:2}
+.codes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+.codes span{padding:1px 8px;border-radius:999px;background:var(--hover);font-variant-numeric:tabular-nums}
+.codes span.c4{background:var(--warn-bg);color:var(--warn)}.codes span.c5,.codes span.c0{background:var(--fail-bg);color:var(--fail)}.codes span.c2{background:var(--pass-bg);color:var(--pass)}
+.empty{padding:28px 10px;text-align:center;color:var(--muted);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right}.tw{overflow-x:auto}.log{height:260px;overflow:auto}
+.ok{color:var(--pass);font-weight:600}.no{color:var(--fail);font-weight:600}.small{font-size:11.5px;color:var(--muted)}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--hover)}
+.now{font-size:13px;margin-top:6px}
+.msg{position:relative;margin-top:6px}.msg pre{padding-right:64px}.msg button{position:absolute;top:6px;right:6px;font:inherit;font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.links{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;margin-top:8px}
+a{color:var(--accent)}
+.histbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.histbar button{font:inherit;font-size:12px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--fg);cursor:pointer}
+.histbar button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:600}
+tr.day td{background:var(--hover);font-weight:600;font-size:12px;color:var(--muted)}
+table.errs td{font-size:12.5px;vertical-align:top}table.errs td:first-child{white-space:nowrap}table.errs td.msg{white-space:normal;min-width:200px}
+details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);font-weight:600}
+.src{display:inline-block;padding:0 6px;border-radius:4px;font-size:11.5px;white-space:nowrap;background:var(--hover)}
+.src.vercel,.src.network{background:var(--fail-bg);color:var(--fail)}.src.backend{background:var(--code)}
+.sheet{margin-top:6px}.sheet table{font-size:12px;white-space:nowrap}.sheet td,.sheet th{padding:4px 6px;border:1px solid var(--line)}
+.sheet th small{display:block;font-weight:400}.sheet ol{font-size:12.5px;color:var(--muted);margin:8px 0 0;padding-left:20px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.tabs .tag{font-size:10px;margin-left:4px;opacity:.75}
+.field.wide{grid-template-columns:1fr}.field.wide .help,.field.wide .dflt{grid-column:1}
+.epbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.eps{border:1px solid var(--line);border-radius:8px;overflow:hidden;max-height:520px;overflow-y:auto}
+.ep{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:6px;padding:5px 8px;font-size:13px;border-bottom:1px solid var(--line);cursor:pointer}
+.ep:last-child{border-bottom:0}.ep:hover{background:var(--hover)}.ep.off{opacity:.55}
+.ep .id{font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.ep .badge{margin-left:4px}
+.ep small{display:block;font-size:11px;color:var(--muted)}
+.api{display:block;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);opacity:.8;word-break:break-all;margin-top:1px}
+.ep .r{display:flex;align-items:center;gap:4px}.ep input[type=number]{width:70px;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.epbar input[type=number]{width:70px;font:inherit;font-size:13px;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+.plan .warn{color:var(--warn)}.plan .bad{color:var(--fail)}
+.lchk{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.lchk .row{display:grid;grid-template-columns:16px minmax(0,1fr);gap:2px 8px;padding:3px 0}
+.lchk .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--s0)}
+.lchk .dot.ok{background:var(--pass)}.lchk .dot.no{background:var(--fail)}.lchk .dot.run{background:var(--warn)}
+.lchk .det{grid-column:2;font-size:11.5px;color:var(--muted)}.lchk .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.real{margin-top:10px;font-size:13px}.real label{display:flex;gap:8px;align-items:center;margin:4px 0}.btns button{font-size:13px;padding:5px 14px}
+</style>
+</head>
+<body>
+<main>
+<div class="top">
+  <h1>pmc-line perf runner</h1>
+  <div class="seg" id="targets" role="group" aria-label="Target"></div>
+  <span class="note" id="baseUrl"></span>
+  <div class="seg" id="lang" role="group" aria-label="Language" style="margin-left:auto"><button type="button" data-lang="en">EN</button><button type="button" data-lang="th">TH</button></div>
+</div>
+<div class="banner warn" id="targetNote" hidden></div>
+
+<div class="grid">
+  <section class="card" aria-label="Set up">
+    <div class="step"><span class="n">1</span><span data-i18n>Scenario</span></div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <p class="desc" id="desc"></p>
+    <details id="guide"><summary data-i18n>What do these settings mean?</summary><div id="guideBody" class="guide"></div></details>
+    <hr class="sep">
+    <div class="step"><span class="n">2</span><span data-i18n>Settings</span></div>
+    <div id="form"></div>
+    <hr class="sep">
+    <div class="step"><span class="n">3</span><span data-i18n>Check and run</span></div>
+    <div class="plan" id="plan"></div>
+    <div class="lchk" id="localBox" hidden>
+      <div class="hd"><b data-i18n>local pmc-line: what this run needs</b><span class="chip" id="localChip"></span>
+        <button type="button" class="mini" id="localPrep" data-i18n>prepare now</button><button type="button" class="mini" id="localRecheck" data-i18n>check again</button></div>
+      <div id="localRows"></div>
+      <div class="small" id="localNote"></div>
+      <details id="localLogBox"><summary data-i18n>prepare log</summary><pre class="log" id="localLog" style="margin-top:6px;height:200px">—</pre></details>
+    </div>
+    <div class="real" id="realBox" hidden>
+      <label><input type="checkbox" id="real"> <span data-i18n>Real run (its numbers go to the results sheet)</span></label>
+      <div id="realMore" hidden>
+        <label><input type="checkbox" id="announced"> <span data-i18n>Announced in the team chat beforehand</span></label>
+        <div class="msg"><pre id="advMsg"></pre><button type="button" data-copy="advMsg" data-i18n>copy</button></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="runBtn" type="button">Run</button>
+      <button class="ghost danger" id="stopBtn" type="button" hidden data-i18n>Stop</button>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+    <details><summary data-i18n>Command</summary><pre id="cmd" style="margin-top:6px"></pre></details>
+  </section>
+
+  <section class="card" aria-live="polite" aria-label="Run">
+    <div class="status"><h2 id="cardTitle">Latest run</h2><span class="chip" id="chip">idle</span><span class="note" id="runMeta"></span></div>
+    <div id="calcBox" class="card" style="margin:10px 0 0;padding:10px 12px" hidden></div>
+    <div class="prog" id="progBox" hidden><i id="prog"></i></div>
+    <div class="banner warn" id="viewBar" hidden style="margin:10px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="viewTxt"></span><span id="viewRunning" hidden style="font-weight:600" data-i18n>· a run is in progress</span><button class="mini" id="exitView" type="button" data-i18n>back to latest run</button></div>
+    <div class="now" id="now"></div>
+    <div id="liveBox" hidden>
+      <div class="kpis" id="kpis"></div>
+      <div class="charts">
+        <div class="chart"><div class="hd"><b data-i18n>TPS (transactions per second)</b><span class="legend" id="lg0"></span></div><canvas id="ch0"></canvas></div>
+        <div class="chart"><div class="hd"><b data-i18n>Response time (ms)</b><span class="legend" id="lg1"></span></div><canvas id="ch1"></canvas></div>
+        <div class="chart"><div class="hd"><b data-i18n>Responses per second by status</b><span class="legend" id="lg2"></span></div><canvas id="ch2"></canvas></div>
+      </div>
+      <div class="codes" id="codes"></div>
+      <div id="failBox" hidden>
+        <h3 data-i18n>Error code detail</h3>
+        <div class="tw"><table class="errs"><thead><tr><th data-i18n>Tag</th><th class="n" data-i18n>Status</th><th data-i18n>Error code</th><th data-i18n>Failed at</th><th data-i18n>Message</th><th class="n" data-i18n>Count</th><th data-i18n>When</th></tr></thead><tbody id="failRows"></tbody></table></div>
+        <div class="note" id="failNote"></div>
+        <div id="minBox" hidden>
+          <h3 data-i18n>Errors per minute</h3>
+          <div class="tw"><table class="errs"><thead><tr><th data-i18n>Minute</th><th data-i18n>Tag</th><th class="n" data-i18n>Status</th><th data-i18n>Error code</th><th data-i18n>Failed at</th><th class="n" data-i18n>Count</th></tr></thead><tbody id="minRows"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+    <div class="empty" id="emptyBox" data-i18n>No run yet. Pick a scenario, then Run. Charts update live here; the shaded band is the hold; ramps count too.</div>
+    <div id="startBox" hidden>
+      <h3 data-i18n>"Started" message (post in the team chat)</h3>
+      <div class="msg"><pre id="startMsg"></pre><button type="button" data-copy="startMsg" data-i18n>copy</button></div>
+    </div>
+    <div id="resultBox" hidden>
+      <h3 data-i18n>Result</h3>
+      <div class="tw"><table><thead><tr><th data-i18n>Row</th><th data-i18n>Window</th><th class="n" data-i18n>p95 (ms)</th><th class="n" data-i18n>err %</th><th class="n" data-i18n>TPS</th><th data-i18n>Result</th></tr></thead><tbody id="resRows"></tbody></table></div>
+      <div class="links" id="links"></div>
+      <h3 data-i18n>"Finished" message (post in the team chat)</h3>
+      <div class="msg"><pre id="endMsg"></pre><button type="button" data-copy="endMsg" data-i18n>copy</button></div>
+      <details id="detailBox"><summary data-i18n>Details (verdict.json): per tag, per step, target throughput</summary><div id="results"></div></details>
+    </div>
+    <div id="peakBox" hidden>
+      <h3 id="peakTitle">Peak</h3>
+      <div class="tw"><table class="errs"><thead><tr><th data-i18n>Row</th><th data-i18n>Peak within the gate</th><th data-i18n>Broke at</th><th data-i18n>Recommended (passed, not at the edge)</th><th data-i18n>p95 ≈ gate</th></tr></thead><tbody id="peakRows"></tbody></table></div>
+      <div class="note" data-i18n>Broke at = first step that failed the gate (p95 or errors) · Recommended = the last step that passed, capped at 80 % of the breaking step when it sits closer than that · p95 ≈ gate = the two steps whose p95 straddles the gate, interpolated</div>
+    </div>
+    <div id="sheetBox" hidden>
+      <h3 id="sheetTitle">Rows for the results sheet</h3>
+      <div class="sheet">
+        <div class="tw"><table><thead id="sheetHead"></thead><tbody id="sheetRows"></tbody></table></div>
+        <div class="btns">
+          <button class="primary" type="button" id="copyRows" style="flex:0 1 auto" data-i18n>copy rows (paste at column A)</button>
+          <button class="ghost" type="button" id="copyHead" data-i18n>copy with header</button>
+          <button class="ghost" type="button" id="copyReport" data-i18n>copy report text (paste in chat)</button>
+        </div>
+        <ol>
+          <li data-i18n>In the sheet, click cell <b>A</b> of the first empty row → press the button above → paste (⌘V / Ctrl+V). Every column lands in one paste.</li>
+          <li data-i18n>Columns are the same as <code>results.csv</code> (lib/report.js): one row per measured window, the whole run and each endpoint tag.</li>
+        </ol>
+      </div>
+    </div>
+    <details id="logBox"><summary data-i18n>k6 log</summary><pre class="log" id="log" style="margin-top:6px">—</pre></details>
+    <details id="histBox" open><summary data-i18n>Past runs (replay the charts / rows for the sheet)</summary>
+      <div class="histbar" id="histBar"></div>
+      <div class="tw"><table><tbody id="hist"></tbody></table></div></details>
+  </section>
+</div>
+
+</main>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="box">
+    <h2 id="mTitle"></h2>
+    <div id="mBody" style="font-size:13px"></div>
+    <ul id="mList">
+      <li data-i18n>The test is <b>scheduled</b> and approved for this time window.</li>
+      <li data-i18n>The team (and on-call for production) <b>has been told</b> it is starting now.</li>
+      <li data-i18n>It uses <b>dedicated perf accounts</b> only, and the data it creates (orders, perf products / codes / partners / users) is agreed with the owners.</li>
+    </ul>
+    <label for="mInput" style="font-size:13px" data-i18n>Type <span class="word" id="mWord"></span> to continue:</label>
+    <input type="text" id="mInput" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <div class="row"><button class="ghost" type="button" id="mCancel" data-i18n>Cancel</button><button class="danger primary" type="button" id="mOk" disabled data-i18n>Confirm</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var META = null, target = 'mock', caseId = 'smoke', values = {}, lastInfo = null;
+  var LIVE = [], liveLen = 0, liveTotal = null, liveFails = [], liveErrs = [], liveErrsMin = [], logLen = 0, VIEW = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmt(v) { return v == null ? '–' : Math.round(v).toLocaleString('en-US'); }
+  function num(v) { return v == null || isNaN(v) ? '–' : (Math.round(v * 10) / 10).toLocaleString('en-US'); }
+  function sec(d) { var t = 0, m, re = /(\d+(?:\.\d+)?)(ms|h|m|s)/g; d = String(d || ''); while ((m = re.exec(d))) t += +m[1] * ({ ms: .001, h: 3600, m: 60, s: 1 })[m[2]]; return t; }
+  function dur(s) { s = Math.round(s); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + 'h ' : '') + (m || h ? m + 'm ' : '') + (h ? '' : x + 's'); }
+  function hms(ts) { var d = new Date(ts * 1000); return [d.getHours(), d.getMinutes(), d.getSeconds()].map(function (n) { return String(n).padStart(2, '0'); }).join(':'); }
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function api(path, body) {
+    var o = body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Runner': '1' }, body: JSON.stringify(body) } : {};
+    return fetch(path, o).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); });
+  }
+
+
+  // ---------- language (EN / TH) ----------
+  // t('English {x}', { x: 1 }) → the Thai template when TH is on; static HTML marked data-i18n is
+  // keyed by its original innerHTML. Server text (scenarios, settings) carries its own .th copy.
+  var LANG = 'en';
+  try { if (localStorage.getItem('pmcRunnerLang') === 'th') LANG = 'th'; } catch (_) {}
+  function t(en, v) { var x = LANG === 'th' && TH[en] != null ? TH[en] : en; return v ? x.replace(/\{(\w+)\}/g, function (m, k) { return v[k] != null ? v[k] : m; }) : x; }
+  var t2 = function (en, v) { return t(en, v); };
+  function L(o, k) { return LANG === 'th' && o && o.th && o.th[k] ? o.th[k] : o[k]; }
+  function applyStatic() {
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      if (el.dataset.en == null) el.dataset.en = el.innerHTML.trim();
+      var word = el.querySelector('#mWord'), w = word ? word.textContent : null;
+      el.innerHTML = t(el.dataset.en);
+      if (w != null && $('mWord')) $('mWord').textContent = w;
+    });
+    $('lang').innerHTML = ['en', 'th'].map(function (l) { return '<button type="button" data-lang="' + l + '" aria-pressed="' + (l === LANG) + '">' + l.toUpperCase() + '</button>'; }).join('');
+  }
+  function setLang(l) {
+    LANG = l; try { localStorage.setItem('pmcRunnerLang', l); } catch (_) {}
+    applyStatic(); if (!META) return;
+    if (SHEET.rows.length) renderSheet(SHEET, $('sheetTitle').textContent.split(' · ')[1]);
+    renderTargets(); renderTabs(); renderForm(); update(); drawHistory();
+    if (VIEW) viewRun(VIEW.info.runId); else { $('cardTitle').textContent = t('Latest run'); renderInfo(lastInfo); drawLive(); }
+  }
+  function winText(w) { var m = /^ramp \+ hold \+ ramp down \((\d+)s\)$/.exec(w || ''); return m ? t('ramp + hold + ramp down ({n}s)', { n: m[1] }) : w === 'whole run' ? t('whole run') : w || ''; }
+  var TH = {
+    // static page
+    'Scenario': 'แบบทดสอบ', 'Settings': 'ตั้งค่า', 'Check and run': 'ตรวจแล้วกดยิง', 'What do these settings mean?': 'ค่าแต่ละช่องหมายถึงอะไร?',
+    'Real run (its numbers go to the results sheet)': 'รอบเก็บผลจริง (ตัวเลขจะเข้า results sheet)', 'Announced in the team chat beforehand': 'แจ้งล่วงหน้าในแชททีมแล้ว',
+    'copy': 'copy', 'copied': 'copied', 'copied ✓': 'copied ✓', 'Stop': 'หยุด', 'Command': 'คำสั่งที่จะรัน', '· a run is in progress': '· มีรอบกำลังยิงอยู่', 'back to latest run': 'กลับไปรอบล่าสุด',
+    'TPS (transactions per second)': 'TPS (transaction ต่อวินาที)', 'Response time (ms)': 'เวลาตอบ (ms)', 'Responses per second by status': 'response ต่อวินาที แยก status',
+    'Error code detail': 'รายละเอียด error code', 'Tag': 'Tag', 'Status': 'Status', 'Error code': 'Error code', 'Failed at': 'พังที่', 'Message': 'ข้อความ', 'Count': 'จำนวน', 'When': 'ช่วงเวลา',
+    'Errors per minute': 'Error รายนาที', 'Minute': 'นาที',
+    'No run yet. Pick a scenario, then Run. Charts update live here; the shaded band is the hold; ramps count too.': 'ยังไม่มีรอบที่ยิง · เลือกแบบทดสอบแล้วกดยิง · กราฟจะขึ้นที่นี่แบบ real-time · แถบสีคือช่วงแช่ · ช่วง ramp นับด้วย',
+    '"Started" message (post in the team chat)': 'ข้อความ "เริ่มยิงแล้ว" (ส่งในแชททีม)', 'Result': 'ผล', 'Row': 'แถว', 'Window': 'ช่วงที่วัด', 'p95 (ms)': 'p95 (ms)', 'err %': 'err %', 'TPS': 'TPS',
+    '"Finished" message (post in the team chat)': 'ข้อความ "จบแล้ว" (ส่งในแชททีม)', 
+    'Peak within the gate': 'Peak ที่ยังผ่านเกณฑ์', 'Broke at': 'พังที่', 'Recommended (passed, not at the edge)': 'แนะนำ (ผ่าน ไม่ชิดจุดพัง)', 'p95 ≈ gate': 'p95 ≈ เกณฑ์',
+    'Broke at = first step that failed the gate (p95 &gt; 300 ms or errors ≥ 1 %) · Recommended = the last step that passed, capped at 80 % of the breaking step when it sits closer than that · p95 ≈ gate = the two steps whose p95 straddles 300 ms, interpolated':
+      'พังที่ = ขั้นแรกที่ไม่ผ่านเกณฑ์ (p95 &gt; 300 ms หรือ error ≥ 1 %) · แนะนำ = ขั้นสุดท้ายที่ผ่าน ถ้าใกล้จุดพังเกินกว่า 80 % ลดเหลือ 80 % ของขั้นที่พัง · p95 ≈ เกณฑ์ = สองขั้นที่ p95 คร่อม 300 ms ประมาณค่าระหว่างกัน',
+    'Rows for the results sheet': 'แถวสำหรับ results sheet', 'copy rows (paste at column A)': 'copy แถว (วางที่คอลัมน์ A)', 'copy with header': 'copy พร้อมหัวตาราง', 'copy report text (paste in chat)': 'copy ข้อความรายงาน (วางในแชท)',
+    'In the sheet, click cell <b>A</b> of the first empty row → press the button above → paste (⌘V / Ctrl+V). Every column lands in one paste.': 'ในชีต คลิกเซลล์ <b>A</b> ของแถวว่างแถวแรก → กดปุ่มด้านบน → วาง (⌘V / Ctrl+V) · ครบทุกคอลัมน์ในครั้งเดียว',
+    'Columns are the same as <code>results.csv</code> (lib/report.js): one row per measured window, the whole run and each endpoint tag.': 'คอลัมน์เหมือน <code>results.csv</code> (lib/report.js): หนึ่งแถวต่อช่วงที่วัด ทั้งรอบและแต่ละ endpoint tag',
+    'k6 log': 'log ของ k6', 'Past runs (replay the charts / rows for the sheet)': 'รอบที่ผ่านมา (ดูกราฟย้อนหลัง / แถวสำหรับ sheet)',
+    'The test is <b>scheduled</b> and approved for this time window.': 'เทสต์นี้ <b>นัดเวลาไว้แล้ว</b> และได้รับอนุมัติสำหรับช่วงเวลานี้',
+    'The team (and on-call for production) <b>has been told</b> it is starting now.': 'ทีม (และ on-call สำหรับ production) <b>ได้รับแจ้งแล้ว</b> ว่ากำลังจะเริ่ม',
+    'It uses <b>dedicated perf accounts and data</b> only, and notifications for them are suppressed.': 'ใช้ <b>perf account และข้อมูลเฉพาะ</b> เท่านั้น และปิดการแจ้งเตือนของ account เหล่านั้นแล้ว',
+    'Type <span class="word" id="mWord"></span> to continue:': 'พิมพ์ <span class="word" id="mWord"></span> เพื่อไปต่อ:', 'Cancel': 'ยกเลิก', 'Confirm': 'ยืนยัน',
+    // targets / tabs / guide
+    'not configured': 'ยังไม่ได้ตั้งค่า', ' — not configured: fill .env from .env.example': ' — ยังไม่ได้ตั้งค่า: กรอก .env ตาม .env.example', 'load': 'โหลด',
+    'default: ': 'ค่าตั้งต้น: ', 'Full guide for every scenario: ': 'คู่มือทุกแบบทดสอบ: ',
+    // checklist / form
+    'all': 'ทั้งหมด', 'none': 'ไม่เลือก', 'use last passing rate': 'ใช้ rate ที่ผ่านล่าสุด', 'fill each TPS box with the highest rate that endpoint passed on {t}': 'ใส่ rate สูงสุดที่แต่ละเส้นเคยผ่านบน {t} ลงช่อง TPS',
+    '{n} / {m} ticked': 'เลือก {n} / {m} เส้น', ' · ladder steps set: TPS boxes are ignored': ' · ใส่ขั้นบันไดแล้ว: ไม่ใช้ช่อง TPS', 'no token': 'ไม่ใช้ token', ' · consumes 1 order / request': ' · ใช้ order 1 อัน / request',
+    ' · last pass {rps} TPS ({mode}, {time})': ' · ผ่านล่าสุด {rps} TPS ({mode}, {time})', ' · no passing run on this target yet': ' · ยังไม่มีรอบที่ผ่านบนปลายทางนี้',
+    'include': 'รวม', 'prepare now': 'เตรียมให้ตอนนี้', 'check again': 'ตรวจอีกครั้ง', 'prepare log': 'log การเตรียม',
+    'checking…': 'กำลังตรวจ…', 'Docker: mongo · redis cluster · mock IDM': 'Docker: mongo · redis cluster · mock IDM', 
+    
+    'not needed for this run': 'รอบนี้ไม่ต้องใช้', 'missing → prepared on Run: {f}': 'ยังไม่มี → เตรียมให้ตอนกดยิง: {f}', 'missing — fix by hand': 'ยังไม่มี — ต้องแก้เอง',
+    'fix by hand': 'ต้องแก้เอง', '{n} to prepare': 'ต้องเตรียม {n} อย่าง', 'ready': 'พร้อม',
+    'Run is blocked until the items marked "fix by hand" are done.': 'กดยิงไม่ได้จนกว่าจะแก้ข้อที่ "ต้องแก้เอง"',
+    'local prepare stopped: see the prepare log': 'การเตรียม local หยุดกลางทาง: ดูใน log การเตรียม', 'PASS per endpoint: at least one request ran and none answered an unexpected status (latency shown, not gated)': 'PASS ต่อเส้น: มี request ของเส้นนั้นจริงอย่างน้อย 1 ครั้ง และไม่มีครั้งไหนตอบ status ผิด (แสดง latency แต่ไม่ใช้ตัดสิน)', 'not measured: no {id} request ran — login / prep failed (see Error detail)': 'ไม่ได้วัด: ไม่มี request ของ {id} เลย — login / prep fail (ดู Error detail)', 
+    'no DB write': 'ไม่เขียน DB', 'only the endpoints that create or change nothing in the databases': 'เฉพาะเส้นที่ไม่สร้างหรือแก้อะไรใน database',
+    ' · no DB write': ' · ไม่เขียน DB', ' · refreshes a cache, creates nothing': ' · อัปเดต cache ไม่สร้างของใหม่', ' · login records (expire)': ' · สร้างข้อมูล login (หมดอายุเอง)', ' · writes the DB': ' · เขียน DB', 'TPS for the ticked:': 'TPS ของเส้นที่ติ๊ก:', 'e.g. 5': 'เช่น 5', 'apply to {n} ticked': 'ใส่ให้ {n} เส้นที่ติ๊ก', 'clear ticked (use the default)': 'ล้างเส้นที่ติ๊ก (ใช้ค่าตั้งต้น)', 'first replays (prep, not measured): {s}': 'ยิงขั้นก่อนหน้าก่อน (prep ไม่นับ): {s}', 'empty = default': 'ว่าง = ค่าตั้งต้น', 'use last passing rate: {rps} TPS': 'ใช้ rate ที่ผ่านล่าสุด: {rps} TPS', 'no passing run of this endpoint on {t} yet': 'ยังไม่มีรอบที่เส้นนี้ผ่านบน {t}', 'Default: ': 'ค่าตั้งต้น: ',
+    // plan
+    'Target <b>{t}</b> · scenario <b>{c}</b>': 'ปลายทาง <b>{t}</b> · แบบทดสอบ <b>{c}</b>', ' at most (stops at the first failing step)': ' อย่างมาก (หยุดที่ขั้นแรกที่ไม่ผ่าน)',
+    ' · ≈ <b>{n}</b> requests': ' · ≈ <b>{n}</b> request', ' · request count depends on the server (VU-based)': ' · จำนวน request ขึ้นกับความเร็วเซิร์ฟเวอร์ (ตาม VU)', ' · peak ≈ <b>{n}</b> TPS': ' · สูงสุด ≈ <b>{n}</b> TPS',
+    'PASS/FAIL over the whole run (ramp up + hold + ramp down): p95 ≤ {p} ms and errors &lt; {e} %': 'PASS/FAIL วัดทั้งรอบ (ramp up + แช่ + ramp down): p95 ≤ {p} ms และ error &lt; {e} %', 'Strict: every check must pass': 'เข้มงวด: ทุก check ต้องผ่าน',
+    'not found': 'ไม่พบ', '{n} orders': '{n} order',
+    'TS-01 part: writes consume ≈ {n} orders at the defaults': 'ส่วน TS-01: write ใช้ order ≈ {n} ที่ค่าตั้งต้น',
+    
+    
+    
+    
+    'tick at least one endpoint': 'ติ๊กอย่างน้อย 1 endpoint',
+    
+    'nothing selected': 'ยังไม่ได้เลือกอะไรเลย',
+    'runs one TS at a time, each with its own defaults; you can close this page — the run continues': 'รันทีละ TS แต่ละตัวใช้ค่าตั้งต้นของตัวเอง · ปิดหน้านี้ได้ รอบยังยิงต่อ',
+    'real run: tick "Announced in the team chat beforehand" first': 'รอบจริง: ติ๊ก "แจ้งล่วงหน้าในแชททีมแล้ว" ก่อน', 'a run is in progress': 'มีรอบที่ยิงอยู่',
+    'Heads-up: perf test · {when} · {t} ({base})': 'แจ้งยิง perf test · {when} · {t} ({base})', ' · ≈ {n} requests': ' · ≈ {n} request', ' · peak ≈ {n} TPS': ' · สูงสุด ≈ {n} TPS',
+    'Run': 'ยิง', 'Run on {t}…': 'ยิงที่ {t}…',
+    // confirmation modal
+    'Switch target to {t}?': 'เปลี่ยนปลายทางเป็น {t}?', 'Run on {t}?': 'ยิงที่ {t}?',
+    'Runs from now on will send real load to <b>{base}</b>. You will be asked again before every run.': 'รอบต่อจากนี้จะส่งโหลดจริงไปที่ <b>{base}</b> · จะถามยืนยันอีกครั้งก่อนยิงทุกรอบ',
+    'About to start <b>{c}</b> against <b>{base}</b> for about <b>{d}</b>.': 'กำลังจะเริ่ม <b>{c}</b> ที่ <b>{base}</b> ประมาณ <b>{d}</b>',
+    // run plan card
+    'smoke (every request path once)': 'smoke (ทุก request path ครั้งเดียว)', 'gap': 'พัก', 'gap between TSs': 'พักระหว่าง TS',
+    'Plan of the running run': 'แผนของรอบที่กำลังยิง', 'Run plan': 'แผนการยิง', '{n} part': '{n} ส่วน', '{n} parts': '{n} ส่วน',
+    'Each part: ramp up {r} → hold {h} → ramp down {d} (the ramp down only after the last step). PASS/FAIL per row over the whole run: p95 ≤ {p} ms and errors &lt; {e} %. Ladder steps are judged on their own window; a ladder stops when a step clearly breaks.':
+      'แต่ละส่วน: ramp up {r} → แช่ {h} → ramp down {d} (ramp down เฉพาะหลังขั้นสุดท้าย) · PASS/FAIL ต่อแถววัดทั้งรอบ: p95 ≤ {p} ms และ error &lt; {e} % · ขั้นบันไดตัดสินจากช่วงของขั้นนั้นเอง · หยุดไต่เมื่อขั้นใดพังชัดเจน',
+    'Strict: every check must pass; latency is reported, not gated.': 'เข้มงวด: ทุก check ต้องผ่าน · latency รายงานเฉย ๆ ไม่ใช่ gate',
+    'TPS = HTTP requests per second (1 request = 1 transaction).': 'TPS = HTTP request ต่อวินาที (1 request = 1 transaction)',
+    'Times are clock times of this run.': 'เวลาเป็นเวลาจริงของรอบนี้', 'Times are from the start of the run.': 'เวลานับจากเริ่มรอบ',
+    'Part': 'ส่วน', 'target TPS': 'เป้า TPS', 'starts': 'เริ่ม', 'ends': 'จบ', 'length': 'นาน',
+    // messages
+    ' · {n} endpoint': ' · {n} endpoint', ' · {n} endpoints': ' · {n} endpoint', ' · own rates ': ' · rate รายเส้น ', ' · default settings': ' · ค่าตั้งต้น',
+    'Started {s} · run `{id}` · {t} ({base})': 'เริ่มยิงแล้ว {s} · run `{id}` · {t} ({base})', 'Expected to finish ~{h} ({d})': 'คาดว่าจบ ~{h} ({d})', 'Schedule:': 'ตารางเวลา:',
+    'idle': 'ว่าง', 'stopping…': 'กำลังหยุด…', 'running': 'กำลังยิง', 'FAIL (exit {n})': 'FAIL (exit {n})',
+    'started {s}': 'เริ่ม {s}', ' · finished {e}': ' · จบ {e}', ' · {d} in': ' · ผ่านไป {d}', ' · ~{d} left': ' · เหลือ ~{d}',
+    'Now: {k} {i}/{n} · {name}': 'ตอนนี้: {k} {i}/{n} · {name}', ' finished · gap before the next {k}': ' จบแล้ว · พักก่อน{k}ถัดไป', 'endpoint': 'เส้น', 'TS': 'TS',
+    'p95 {v} > {g} ms': 'p95 {v} > {g} ms', 'errors {v} % ≥ {g} %': 'error {v} % ≥ {g} %', 'capacity within the gate {v}': 'ความจุที่ผ่านเกณฑ์ {v}', 'none (failed from the first step)': 'ไม่มี (ไม่ผ่านตั้งแต่ขั้นแรก)', 'failed: {v}': 'ไม่ผ่าน: {v}',
+    'No result files (verdict.json) · see the k6 log': 'ไม่มีไฟล์ผล (verdict.json) · ดู log ของ k6',
+    'open report': 'เปิด report', 'report screenshot (attach in chat)': 'ภาพ report (แนบแชท)', 'CSV for the sheet': 'CSV สำหรับ sheet', 'k6 summary (JSON)': 'k6 summary (JSON)',
+    'no screenshot (Google Chrome not found)': 'ไม่มีภาพ (ไม่พบ Google Chrome)', 'files are in results/{id}_*': 'ไฟล์อยู่ที่ results/{id}_*',
+    'Finished {e} · run `{id}`': 'จบแล้ว {e} · run `{id}`', ' · stopped part-way': ' · หยุดกลางคัน', '[attach the report screenshot]': '[แนบภาพ report]', ' · errors ': ' · error ',
+    'Window': 'ช่วงที่วัด', 'Requests': 'Requests', 'errors': 'error', 'Failed: ': 'ไม่ผ่าน: ',
+    'met': 'ถึง', 'not met': 'ไม่ถึง',
+    ' · capacity within gate: <b>{v} TPS</b>': ' · ความจุที่ผ่านเกณฑ์: <b>{v} TPS</b>', 'Step': 'ขั้น', 'offered': 'ตั้งยิง', 'achieved': 'ยิงได้จริง', 'delivered': 'ยิงถึง', 'Per tag (slowest first)': 'ราย tag (ช้าสุดก่อน)',
+    // peak
+    'Peak · {id}': 'Peak · {id}', 'step {p} · achieved {a} · p95 {v} ms · errors {e} %': 'ขั้น {p} · ยิงได้จริง {a} · p95 {v} ms · error {e} %', 'failed from the first step': 'ไม่ผ่านตั้งแต่ขั้นแรก',
+    'p95 {v} ms': 'p95 {v} ms', 'errors {v} %': 'error {v} %', 'achieved {a} of {o} TPS': 'ยิงได้จริง {a} จาก {o} TPS', '(step {p})': '(ขั้น {p})', 'failed the gate': 'ไม่ผ่านเกณฑ์', ' · ladder stopped here': ' · หยุดไต่ที่นี่',
+    'did not break within the steps run': 'ยังไม่ถึงจุดพังในขั้นที่ยิง', '80 % of the breaking step (the last passing step is too close to it)': '80 % ของขั้นที่พัง (ขั้นที่ผ่านล่าสุดใกล้จุดพังเกินไป)', 'the last step that passed': 'ขั้นสุดท้ายที่ผ่าน',
+    'p95 under the gate at every step': 'p95 ต่ำกว่าเกณฑ์ทุกขั้น', 'p95 over the gate from the first step': 'p95 เกินเกณฑ์ตั้งแต่ขั้นแรก', 'gate p95 ≤ {g} ms': 'เกณฑ์ p95 ≤ {g} ms',
+    // sheet
+    'Rows for the results sheet · {id} · {n} row': 'แถวสำหรับ results sheet · {id} · {n} แถว', 'Rows for the results sheet · {id} · {n} rows': 'แถวสำหรับ results sheet · {id} · {n} แถว',
+    // charts / errors / KPIs
+    'no response': 'ไม่ได้ response', 'per second': 'ต่อวินาที', '5 s average': 'เฉลี่ย 5 วิ', 'target': 'เป้า', 'p95 gate {g}': 'เกณฑ์ p95 {g}', ' · no requests': ' · ไม่มี request',
+    'hold (ramps measured too)': 'ช่วงแช่ (ramp วัดด้วย)', '↑ {l} ms (above the chart)': '↑ {l} ms (สูงกว่ากราฟ)',
+    'first 30 of {n} kinds · ': 'แสดง 30 จาก {n} แบบ · ',
+        'network / k6': 'network / k6', 'other': 'อื่น ๆ',
+    'the gateway answered itself': 'gateway ตอบเอง', 
+    'last 10 s': '10 วิล่าสุด', 'target {v}': 'เป้า {v}', ' (at hold)': ' (ตอนแช่)', 'gate ≤ {g} ms': 'เกณฑ์ ≤ {g} ms', 'gate &lt; {g} % (incl. &gt; 1 s) · whole run {a}': 'เกณฑ์ &lt; {g} % (รวมที่ช้ากว่า 1 วิ) · ทั้งรอบ {a}',
+    'requests': 'requests', 'failed {n}': 'fail {n}', 'VUs': 'VUs', 'dropped {n}': 'ยิงไม่ทัน {n}', 'stage': 'ช่วง', 'finished': 'จบแล้ว',
+    // history / replay
+    'selected tab ({c} · {n})': 'ตามแท็บที่เลือก ({c} · {n})', 'all ({n})': 'ทั้งหมด ({n})', 'screenshot': 'ภาพ', 'charts': 'กราฟ', 'result': 'ผล', 'no charts': 'ไม่มีกราฟ', 'rows for sheet': 'ลง sheet',
+    'No runs of this scenario yet · press "all" to see every run': 'ยังไม่มีรอบของแบบนี้ · กด "ทั้งหมด" เพื่อดูทุกแบบ', 'No runs in results/ yet.': 'ยังไม่มีรอบใน results/',
+    'Past run · {id}': 'รอบย้อนหลัง · {id}', ' (no charts saved for this run)': ' (รอบนี้ไม่ได้เก็บกราฟ)', 'Selected run (past)': 'รอบที่เลือก (ย้อนหลัง)', 'no verdict': 'ไม่มี verdict', 'Latest run': 'รอบล่าสุด',
+    'runner not reachable: ': 'ติดต่อ runner ไม่ได้: ', 'whole run': 'ทั้งรอบ', 'ramp + hold + ramp down ({n}s)': 'ramp + แช่ + ramp down ({n} วิ)',
+    // pmc-line
+    'creates ≈ {n} real orders (+ a slip file each in GCS)': 'สร้างออเดอร์จริง ≈ {n} ใบ (+ ไฟล์สลิปใน GCS ใบละ 1)',
+    '≈ {n} write requests: documents created / changed (README "What a run leaves behind")': '≈ {n} request ที่เขียน: document ถูกสร้าง / แก้ (README "What a run leaves behind")',
+    'this run signs in as SUPER_ADMIN: set PERF_ADMIN_USER + PERF_ADMIN_PASS in .env or .env.{t}': 'รอบนี้ login เป็น SUPER_ADMIN: ใส่ PERF_ADMIN_USER + PERF_ADMIN_PASS ใน .env หรือ .env.{t}',
+    'this run signs in as PARTNER_ADMIN: set PERF_PARTNER_USER + PERF_PARTNER_PASS in .env or .env.{t}': 'รอบนี้ login เป็น PARTNER_ADMIN: ใส่ PERF_PARTNER_USER + PERF_PARTNER_PASS ใน .env หรือ .env.{t}',
+    'products.image needs PERF_IMAGE_FILE_ID (a QR / product file id) in .env or .env.{t}': 'products.image ต้องมี PERF_IMAGE_FILE_ID (file id ของ QR / รูปสินค้า) ใน .env หรือ .env.{t}',
+    'needs no admin account (public endpoints only)': 'ไม่ต้องใช้บัญชี admin (เส้นสาธารณะอย่างเดียว)', 'host not set: put PERF_{T}_BASE in .env.{t}': 'ยังไม่ได้ตั้ง host: ใส่ PERF_{T}_BASE ใน .env.{t}',
+    'the spec\'s five "List Load Test" lines: orders 10 · products 50 · admin orders 50 · dashboard 50 · admin products 10 TPS': '5 เส้นหลักตามเอกสาร List Load Test: สั่งซื้อ 10 · products 50 · admin orders 50 · dashboard 50 · admin products 10 TPS',
+    'no cookie': 'ไม่ใช้ cookie', 'admin (PERF_ADMIN_ROLE)': 'admin (ตาม PERF_ADMIN_ROLE)', ' · writes per request': ' · เขียนทุก request', ' · fills an in-memory cache, writes nothing': ' · เติม cache ในหน่วยความจำ ไม่เขียนอะไร',
+    'missing → "prepare now" runs: {f}': 'ยังไม่มี → "เตรียมให้ตอนนี้" จะรัน: {f}',
+    'local pmc-line: what this run needs': 'local pmc-line: สิ่งที่รอบนี้ต้องมี',
+    'Dev / Platform: please stand by and watch Vercel function duration / errors, Firestore reads & writes and GCS.': 'รบกวน Dev / Platform ช่วย standby ดู duration / error ของ Vercel function, read & write ของ Firestore และ GCS ด้วยครับ',
+    'Vercel edge': 'Vercel edge', 'pmc-line route': 'route ของ pmc-line', 'the platform answered, not the app (timeout 504, payload 413, WAF, 502)': 'platform ตอบเอง ไม่ใช่แอป (timeout 504, payload 413, WAF, 502)', 'the app\'s own error envelope': 'error envelope ของแอปเอง',
+    'status 0 = no response (timeout / connection error) · Vercel edge = the platform answered, not the app · tags starting with prep. are setup steps (login, fixtures), not the measured call · run Smoke with "Print failures" to see bodies':
+      'status 0 = ไม่ได้ response (timeout / connection error) · Vercel edge = platform ตอบเอง ไม่ใช่แอป · tag ที่ขึ้นต้นด้วย prep. คือขั้นเตรียม (login, fixture) ไม่ใช่ call ที่วัด · รัน Smoke แบบ "พิมพ์ที่ fail" เพื่อดู body',
+    'gate &lt; {g} % (incl. &gt; {s} s) · whole run {a}': 'เกณฑ์ &lt; {g} % (รวมที่ช้ากว่า {s} วิ) · ทั้งรอบ {a}',
+    'Target throughput (reported, not gated): {n} of ≥ {f} requests at {r} TPS over the window — {m}': 'throughput เป้าหมาย (รายงานเฉย ๆ ไม่ใช่ gate): {n} จาก ≥ {f} request ที่ {r} TPS ตลอดช่วง — {m}', 'orders placed: {n}': 'สั่งซื้อแล้ว {n} ใบ',
+    '⚠ Stopped part-way: the window is shorter than planned, so TPS and the target throughput read low. Do not use this run for the sheet.': '⚠ หยุดกลางคัน: ช่วงที่วัดสั้นกว่าที่ตั้งไว้ TPS และ throughput เป้าหมายจึงต่ำกว่าจริง · ไม่ควรใช้รอบนี้ลง sheet',
+    'Details (verdict.json): per tag, per step, target throughput': 'รายละเอียด (verdict.json): ราย tag ราย step throughput เป้าหมาย',
+    'Broke at = first step that failed the gate (p95 or errors) · Recommended = the last step that passed, capped at 80 % of the breaking step when it sits closer than that · p95 ≈ gate = the two steps whose p95 straddles the gate, interpolated':
+      'พังที่ = ขั้นแรกที่ไม่ผ่านเกณฑ์ (p95 หรือ error) · แนะนำ = ขั้นสุดท้ายที่ผ่าน ถ้าใกล้จุดพังเกินกว่า 80 % ลดเหลือ 80 % ของขั้นที่พัง · p95 ≈ เกณฑ์ = สองขั้นที่ p95 คร่อมเกณฑ์ ประมาณค่าระหว่างกัน',
+    'It uses <b>dedicated perf accounts</b> only, and the data it creates (orders, perf products / codes / partners / users) is agreed with the owners.': 'ใช้ <b>บัญชี perf เฉพาะ</b> เท่านั้น และข้อมูลที่สร้าง (ออเดอร์, สินค้า / โค้ด / พาร์ทเนอร์ / ผู้ใช้ perf) ตกลงกับเจ้าของระบบแล้ว'
+  };
+
+  // ---------- form ----------
+  function fieldsOf(c) { return META.cases[c].fields; }
+  function val(k) { var f = fieldsOf(caseId).filter(function (x) { return x.key === k; })[0]; var v = values[caseId] && values[caseId][k]; return v != null ? v : f ? f.default : ''; }
+  // stg / prod carry a word to type (the human-error guard); mock and local do not
+  function typedTarget(k) { var x = META && META.targets[k || target]; return !!(x && x.word); }
+  function renderTargets() {
+    $('targets').innerHTML = Object.keys(META.targets).map(function (k) {
+      var t = META.targets[k];
+      return '<button type="button" data-t="' + k + '" aria-pressed="' + (k === target) + '"' + (t.ok ? '' : ' title="' + t2('not configured') + '"') + '>' + esc(t.label) + '</button>';
+    }).join('');
+    var t = META.targets[target];
+    loadLocal();
+    $('baseUrl').textContent = t.base;
+    $('targetNote').hidden = false;
+    $('targetNote').textContent = (LANG === 'th' && t.noteTh ? t.noteTh : t.note) + (t.ok ? '' : t2(' — not configured: fill .env from .env.example'));
+  }
+  function renderTabs() {
+    $('tabs').innerHTML = Object.keys(META.cases).map(function (k) {
+      return '<button type="button" role="tab" data-c="' + k + '" aria-selected="' + (k === caseId) + '">' + esc(META.cases[k].label) + (META.cases[k].steady ? '<span class="tag">' + t('load') + '</span>' : '') + '</button>';
+    }).join('');
+    $('desc').textContent = L(META.cases[caseId], 'desc');
+    var c = META.cases[caseId];
+    $('guideBody').innerHTML = '<p>' + esc(L(c, 'how')) + '</p><dl>' + c.fields.map(function (f) {
+      return '<dt>' + esc(L(f, 'label')) + ' <small>· <code>' + esc(f.key) + '</code> · ' + t('default: ') + esc(L(f, 'dflt')) + '</small></dt><dd>' + esc(L(f, 'info')) + '</dd>';
+    }).join('') + '</dl><p class="small" style="margin-top:8px">' + t('Full guide for every scenario: ') + '<code>docs/runner-settings.md</code></p>';
+  }
+  // ---------- endpoint checklist (TS-01 Group Run) ----------
+  var LASTPASS = {}, BULK = '';
+  // one TPS (whole number) into the box of every ticked endpoint, or empty them ('clear')
+  function bulkRate(how) {
+    var v = Math.round(+$('bulkTps').value);
+    if (how === 'set' && !(v > 0)) { $('bulkTps').focus(); return; }
+    BULK = how === 'set' ? String(v) : BULK;
+    document.querySelectorAll('[data-ep]').forEach(function (cb) {
+      var r = cb.checked && document.querySelector('[data-rate="' + cb.dataset.ep + '"]'); if (r) r.value = how === 'set' ? v : '';
+    });
+    readEps(); renderForm(); update();
+  }
+  function loadLastPass() { api('/api/lastpass?target=' + target).then(function (d) { LASTPASS = d || {}; renderForm(); update(); }).catch(function () {}); }
+  function kindsAll() { return META.cases.ts01.fields[0].kinds || {}; }
+  function whoOf(id) { return (META.cases.ts01.fields[0].who || {})[id] || ''; }
+  // what one call leaves in the databases (lib/endpoints.js `db`): none | cache | session | write
+  function dbOf(id) { return (META.cases.ts01.fields[0].db || {})[id] || ''; }
+  var DB_NOTE = { none: ' · no DB write', cache: ' · fills an in-memory cache, writes nothing', write: ' · writes the DB' };
+  // the measured request (lib/endpoints.js `api`)
+  function apiOf(id) { var a = (META.cases.ts01.fields[0].api || {})[id] || ''; return a ? '<span class="api">' + esc(a) + '</span>' : ''; }
+  // TS-01 default rate (lib/endpoints.js `rate`, from the docs' priority lines)
+  function ts01Dflt(id) { return (META.cases.ts01.fields[0].rates || {})[id] || 20; }
+  function heavyOf(id) { return !!(META.cases.ts01.fields[0].heavy || {})[id]; }
+  function focusOf(id) { return !!(META.cases.ts01.fields[0].focus || {})[id]; } // the spec's five "List Load Test" lines
+  // the priority mix's total (soak / stress / spike): PERF_MIX weights, default 170
+  function mixTotal(e) { var w = { order: 10, products: 50, orders: 50, dashboard: 50, catalog: 10 }; String(e.PERF_MIX || '').split(',').forEach(function (x) { var a = x.split(':'); if (a.length === 2 && w[a[0]] != null && +a[1] >= 0) w[a[0]] = +a[1]; }); var s = 0; Object.keys(w).forEach(function (k) { s += w[k]; }); return s; }
+  function mixOrderShare(e) { var m = /(?:^|,)order:(\d+)/.exec(e.PERF_MIX || ''); var o = m ? +m[1] : 10, tot = mixTotal(e); return tot ? o / tot : 0; }
+  function defRate(id) { var r = val('PERF_RPS'); return r !== '' && r != null ? r : String(ts01Dflt(id)); }
+  // TS-01 Group Run and Check share the endpoint checklist (ENDPOINTS + TS01_RATES)
+  function isList() { return caseId === 'ts01q' || caseId === 'check'; }
+  function picked() { var v = val('ENDPOINTS'); return v == null || v === '' ? null : v.split(',').filter(Boolean); }
+  function pickList() { var p = picked(), k = kindsAll(); return p || Object.keys(k).filter(function (id) { return k[id] === 'read' && !heavyOf(id); }); }
+  function rateMap() { var m = {}; String(val('TS01_RATES') || '').split(',').forEach(function (x) { var a = x.split(':'); if (a.length === 2 && +a[1] > 0) m[a[0]] = a[1]; }); return m; }
+  function setVal(k, v) { values[caseId] = values[caseId] || {}; values[caseId][k] = v; }
+  function epList() {
+    var kinds = kindsAll(), pk = pickList(), rates = rateMap(), ladder = !!String(val('PERF_STEPS') || '').trim();
+    var groups = [['focus', 'focus'], ['reads', 'read'], ['heavy', 'heavy'], ['auth', 'auth'], ['writes', 'write']];
+    var inGroup = function (k, g) { return g === 'focus' ? focusOf(k) : g === 'heavy' ? heavyOf(k) : g === 'read' ? kinds[k] === 'read' && !heavyOf(k) : kinds[k] === g; };
+    return '<div class="epbar"><button type="button" class="mini" data-pick="all">' + t('all') + '</button><button type="button" class="mini" data-pick="none">' + t('none') + '</button>' +
+      groups.map(function (g) { return '<button type="button" class="mini" data-pick="' + g[1] + '" title="' + (g[1] === 'focus' ? t('the spec\'s five "List Load Test" lines: orders 10 · products 50 · admin orders 50 · dashboard 50 · admin products 10 TPS') : '') + '">' + (g[1] === 'focus' ? '★ ' : '') + g[0] + ' (' + Object.keys(kinds).filter(function (k) { return inGroup(k, g[1]); }).length + ')</button>'; }).join('') +
+      '<button type="button" class="mini" data-pick="nodb" title="' + t('only the endpoints that create or change nothing in the databases') + '">' + t('no DB write') + ' (' + Object.keys(kinds).filter(function (k) { return dbOf(k) !== 'write'; }).length + ')</button>' +
+      '<button type="button" class="mini" data-uselast="1" title="' + t('fill each TPS box with the highest rate that endpoint passed on {t}', { t: esc(META.targets[target].label) }) + '">' + t('use last passing rate') + '</button>' +
+      '<span class="note">' + t('{n} / {m} ticked', { n: pk.length, m: Object.keys(kinds).length }) + (ladder ? t(' · ladder steps set: TPS boxes are ignored') : '') + '</span></div>' +
+      // one TPS for every ticked endpoint at once (each box can still be changed after)
+      '<div class="epbar"><label class="note" for="bulkTps">' + t('TPS for the ticked:') + '</label><input type="number" id="bulkTps" min="1" step="1" value="' + esc(BULK) + '" placeholder="' + t('e.g. 5') + '"' + (ladder ? ' disabled' : '') + '>' +
+      '<button type="button" class="mini" data-bulk="set"' + (ladder ? ' disabled' : '') + '>' + t('apply to {n} ticked', { n: pk.length }) + '</button>' +
+      '<button type="button" class="mini" data-bulk="clear"' + (ladder ? ' disabled' : '') + '>' + t('clear ticked (use the default)') + '</button></div>' +
+      '<div class="eps">' + Object.keys(kinds).map(function (id) {
+        var on = pk.indexOf(id) >= 0, lp = LASTPASS[id];
+        return '<label class="ep' + (on ? '' : ' off') + '"><input type="checkbox" data-ep="' + esc(id) + '"' + (on ? ' checked' : '') + '>' +
+          '<span><span class="id">' + (focusOf(id) ? '★ ' : '') + esc(id) + '</span><span class="badge ' + esc(kinds[id]) + '">' + esc(kinds[id]) + (heavyOf(id) ? ' · heavy' : '') + '</span>' +
+          apiOf(id) + '<small>' + esc(whoOf(id) === 'none' ? t('no cookie') : whoOf(id) === 'super' ? 'SUPER_ADMIN' : t('admin (PERF_ADMIN_ROLE)')) + (kinds[id] === 'write' ? t(' · writes per request') : '') +
+          (DB_NOTE[dbOf(id)] && !(kinds[id] === 'write' && dbOf(id) === 'write') ? '<span style="font-weight:400;color:var(' + (dbOf(id) === 'none' ? '--pass' : '--warn') + ')">' + t(DB_NOTE[dbOf(id)]) + '</span>' : '') +
+          (lp ? t(' · last pass {rps} TPS ({mode}, {time})', { rps: num(lp.rps), mode: esc(lp.mode || ''), time: esc(lp.time) }) : t(' · no passing run on this target yet')) + '</small></span>' +
+          '<span class="r"><input type="number" min="1" step="1" data-rate="' + esc(id) + '" value="' + esc(rates[id] || '') + '" placeholder="' + esc(defRate(id)) + '"' + (ladder ? ' disabled' : '') + ' aria-label="TPS ' + esc(id) + '"><span class="note">TPS</span></span></label>';
+      }).join('') + '</div>';
+  }
+  function readEps() {
+    var ids = [], rates = [];
+    document.querySelectorAll('[data-ep]').forEach(function (cb) {
+      if (!cb.checked) return; ids.push(cb.dataset.ep);
+      var r = document.querySelector('[data-rate="' + cb.dataset.ep + '"]'); if (r && +r.value > 0) rates.push(cb.dataset.ep + ':' + Math.round(+r.value)); // TS-01 takes whole TPS
+    });
+    setVal('ENDPOINTS', ids.join(',')); setVal('TS01_RATES', rates.join(','));
+  }
+  function renderForm() {
+    $('form').innerHTML = fieldsOf(caseId).filter(function (f) { return !f.hidden; }).map(function (f) {
+      var v = val(f.key), input;
+      if (f.eplist) return '<div class="field wide"><div id="epwrap">' + epList() + '</div><div class="help">' + esc(L(f, 'hint')) + '</div></div>';
+      if (f.check) {
+        input = '<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="f_' + f.key + '" data-check="1"' + (v === '1' ? ' checked' : '') + '> ' + t('include') + '</label>';
+      } else if (f.options) {
+        input = '<select id="f_' + f.key + '">' + (L(f, 'options') || f.options).map(function (o) {
+          return '<option value="' + esc(o[0]) + '"' + (o[0] === v ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+        }).join('') + '</select>';
+        if (f.kinds) input += '<span class="badge ' + esc(f.kinds[v] || '') + '" id="kind">' + esc(f.kinds[v] || '') + '</span>' + apiOf(v);
+      } else input = '<input type="text" id="f_' + f.key + '" value="' + esc(v) + '" placeholder="' + esc(f.default === '' ? t('empty = default') : f.default) + '">';
+      if (caseId === 'ts01' && f.key === 'PERF_RPS') {
+        var lp = LASTPASS[val('PERF_ENDPOINT')];
+        input += lp ? '<div style="margin-top:4px"><button type="button" class="mini" data-uselast="1">' + t('use last passing rate: {rps} TPS', { rps: num(lp.rps) }) + '</button> <span class="small">' + esc(lp.runId) + ' · ' + esc(lp.time) + '</span></div>' : '<div class="small" style="margin-top:4px">' + t('no passing run of this endpoint on {t} yet', { t: esc(META.targets[target].label) }) + '</div>';
+      }
+      return '<div class="field"><label for="f_' + f.key + '" title="' + esc(L(f, 'info')) + '">' + esc(L(f, 'label')) + '</label><div>' + input + '</div>' +
+        (f.hint ? '<div class="help">' + esc(L(f, 'hint')) + '</div>' : '') +
+        '<div class="dflt">' + t('Default: ') + '<b>' + esc(L(f, 'dflt')) + '</b></div></div>';
+    }).join('');
+  }
+  function envNow() {
+    var e = {}; fieldsOf(caseId).forEach(function (f) { var v = val(f.key); if (v !== '' && v != null) e[f.key] = v; });
+    if (isList()) { e.ENDPOINTS = pickList().join(','); if (!e.ENDPOINTS) delete e.ENDPOINTS; if (!e.TS01_RATES) delete e.TS01_RATES; }
+    return e;
+  }
+
+  // duration estimate from the same shape the scripts use
+  function estimate(e) {
+    var r = sec(e.PERF_RAMP || '30s'), h = sec(e.PERF_HOLD || '5m'), d = sec(e.PERF_RAMP_DOWN || '30s');
+    var steps = String(e.PERF_STEPS || '').split(',').filter(function (x) { return +x > 0; }).length || 1;
+    switch (caseId) {
+      case 'smoke': return 30;
+      case 'tsall': {
+        var shape = sec(e.TSALL_RAMP || '30s') + sec(e.TSALL_HOLD || '5m') + sec(e.TSALL_RAMP_DOWN || '30s'), gap = +(e.TSALL_GAP || 60), parts = [], kinds = META.cases.ts01.fields[0].kinds || {};
+        var nEp = Object.keys(kinds).filter(function (id) { return !heavyOf(id); }).length;
+        if (e.TSALL_TS01 !== '0') parts.push(nEp * (shape + 60) - 60);
+        ['TSALL_TS02', 'TSALL_TS03', 'TSALL_TS04'].forEach(function (k) { if (e[k] !== '0') parts.push(shape); });
+        return parts.reduce(function (a, b) { return a + b; }, 0) + Math.max(0, parts.length - 1) * gap;
+      }
+      case 'ts01': return (r + h) * steps + d;
+      case 'check': {
+        var nc = String(e.ENDPOINTS || '').split(',').filter(Boolean).length;
+        return nc * (sec(e.PERF_HOLD || '1s') + (+(e.CHECK_GAP || 1))) + 5;
+      }
+      case 'ts01q': {
+        var n = String(e.ENDPOINTS || '').split(',').filter(Boolean).length;
+        return n * ((r + h) * steps + d) + Math.max(0, n - 1) * (+(e.TS01_GAP || 60));
+      }
+      case 'soak': return r + sec(e.PERF_SOAK_HOLD || '15m') + d;
+      case 'stress': return (r + sec(e.PERF_STRESS_HOLD || '5m')) * Math.floor((+e.PERF_STRESS_MAX || 1000) / (+e.PERF_STRESS_STEP || 50)) + d;
+      case 'spike': return sec(e.PERF_SPIKE_RAMP || '10s') + h + d;
+      default: return r + h + d;
+    }
+  }
+  // requests / peak TPS / orders created / write requests, from the run plan
+  function needs(e) {
+    var plan = planOf(caseId, e), kinds = kindsAll(), req = 0, peak = 0, known = true, orders = 0, writes = 0;
+    plan.forEach(function (p) {
+      if (p.gap) return;
+      if (p.rps == null) { known = false; return; }
+      var n = p.rps * (p.up / 2 + p.hold + p.down / 2);
+      req += n; peak = Math.max(peak, p.rps);
+      if (p.ep) { if (p.ep === 'orders.create') orders += n; if (kinds[p.ep] === 'write') writes += n; }
+      else if (/^mix\b/.test(p.part)) { orders += n * mixOrderShare(e); }
+    });
+    if (caseId === 'ts02' || (caseId === 'tsall' && e.TSALL_TS02 !== '0')) orders += (caseId === 'ts02' ? +(e.PERF_ORDERS_PER_SEC || 10) : 10) * (sec(e.PERF_RAMP || e.TSALL_RAMP || '30s') / 2 + sec(e.PERF_HOLD || e.TSALL_HOLD || '5m') + sec(e.PERF_RAMP_DOWN || e.TSALL_RAMP_DOWN || '30s') / 2);
+    if (caseId === 'ts03' || (caseId === 'tsall' && e.TSALL_TS03 !== '0')) writes += req * 0.5 / 4; // note 0.3 + status 0.2 of 4 calls
+    if (caseId === 'ts03') writes = req * 0.5 / 4;
+    if (caseId === 'smoke' && (e.PERF_SMOKE_SECTIONS || 'all') === 'all') { orders = 1; writes = 20; }
+    return { req: known ? req : null, peak: peak || null, orders: orders, writes: writes };
+  }
+  // which accounts this run signs in with — mirrors requirements() in runner.py (the server decides)
+  function needsOf(cs, e) {
+    var kinds = kindsAll(), out = {}, admin = e.PERF_ADMIN_ROLE === 'partner' ? 'partner' : 'super';
+    var of = function (ids) {
+      ids.forEach(function (id) {
+        if (!kinds[id]) return;
+        var w = whoOf(id);
+        if (w === 'admin' || kinds[id] === 'auth') out[admin] = true;
+        if (w === 'super') out.super = true;
+        if (id === 'products.image') out.imageId = true;
+      });
+    };
+    if (cs === 'ts01') of([e.PERF_ENDPOINT || '']);
+    else if (cs === 'ts01q' || cs === 'check') of(String(e.ENDPOINTS || '').split(','));
+    else if (cs === 'ts02') {}
+    else if (cs === 'smoke') { var secs = e.PERF_SMOKE_SECTIONS || 'all'; if (secs === 'all' || /ts01|writes/.test(secs)) { out[admin] = true; out.super = true; } }
+    else if (cs === 'tsall') { if (e.TSALL_TS01 !== '0') of(Object.keys(kinds)); if (e.TSALL_TS03 !== '0' || e.TSALL_TS04 !== '0') out[admin] = true; }
+    else out[admin] = true;
+    return out;
+  }
+  function update() {
+    var e = envNow(), est = estimate(e), c = META.cases[caseId], n = needs(e), D = (META.data || {})[target] || {}, mock = target === 'mock';
+    var warn = [], bad = [], info = [];
+    var busy = lastInfo && !lastInfo.done, real = typedTarget() && $('real').checked, announced = $('announced').checked;
+    var lines = [t('Target <b>{t}</b> · scenario <b>{c}</b>', { t: esc(META.targets[target].label), c: esc(c.label) }),
+      '≈ <b>' + dur(est) + '</b>' + (caseId === 'stress' ? t(' at most (stops at the first failing step)') : '') +
+        (n.req != null ? t(' · ≈ <b>{n}</b> requests', { n: fmt(n.req) }) : c.steady ? t(' · request count depends on the server (VU-based)') : '') + (n.peak ? t(' · peak ≈ <b>{n}</b> TPS', { n: num(n.peak) }) : ''),
+      c.steady ? t('PASS/FAIL over the whole run (ramp up + hold + ramp down): p95 ≤ {p} ms and errors &lt; {e} %', { p: META.gate.p95, e: META.gate.errPct }) : caseId === 'check' ? t('PASS per endpoint: at least one request ran and none answered an unexpected status (latency shown, not gated)') : t('Strict: every check must pass')];
+    var k = $('kind'); if (k) { var kinds = fieldsOf(caseId)[0].kinds || {}; k.className = 'badge ' + (kinds[val('PERF_ENDPOINT')] || ''); k.textContent = (kinds[val('PERF_ENDPOINT')] || '') + (heavyOf(val('PERF_ENDPOINT')) ? ' · heavy' : ''); }
+    if (n.orders >= 1) info.push(t('creates ≈ {n} real orders (+ a slip file each in GCS)', { n: fmt(n.orders) }));
+    if (n.writes >= 1) info.push(t('≈ {n} write requests: documents created / changed (README "What a run leaves behind")', { n: fmt(n.writes) }));
+    var need = needsOf(caseId, e), C = META.targets[target].creds || {};
+    if (!mock) {
+      if (need.super && !C.super) bad.push(t('this run signs in as SUPER_ADMIN: set PERF_ADMIN_USER + PERF_ADMIN_PASS in .env or .env.{t}', { t: target }));
+      if (need.partner && !C.partner) bad.push(t('this run signs in as PARTNER_ADMIN: set PERF_PARTNER_USER + PERF_PARTNER_PASS in .env or .env.{t}', { t: target }));
+      if (need.imageId && !C.imageId) bad.push(t('products.image needs PERF_IMAGE_FILE_ID (a QR / product file id) in .env or .env.{t}', { t: target }));
+      if (!need.super && !need.partner) info.push(t('needs no admin account (public endpoints only)'));
+      if (typedTarget() && /not set/.test(META.targets[target].base || '')) bad.push(t('host not set: put PERF_{T}_BASE in .env.{t}', { T: target.toUpperCase(), t: target }));
+    }
+    if (isList() && !e.ENDPOINTS) bad.push(t('tick at least one endpoint'));
+    if (caseId === 'tsall' && e.TSALL_TS01 === '0' && e.TSALL_TS02 === '0' && e.TSALL_TS03 === '0' && e.TSALL_TS04 === '0') bad.push(t('nothing selected'));
+    if (caseId === 'tsall') info.push(t('runs one TS at a time, each with its own defaults; you can close this page — the run continues'));
+    if (real && !announced) bad.push(t('real run: tick "Announced in the team chat beforehand" first'));
+    if (busy) bad.push(t('a run is in progress'));
+    $('plan').innerHTML = lines.join('<br>') + info.map(function (x) { return '<div class="small">· ' + x + '</div>'; }).join('') +
+      warn.map(function (x) { return '<div class="warn">⚠ ' + x + '</div>'; }).join('') + bad.map(function (x) { return '<div class="bad">⛔ ' + x + '</div>'; }).join('');
+    // announce-before-run (stg / prod)
+    $('realBox').hidden = !typedTarget(); $('realMore').hidden = !real;
+    if (real) $('advMsg').textContent = t('Heads-up: perf test · {when} · {t} ({base})', { when: nowStamp(), t: META.targets[target].label, base: META.targets[target].base }) + '\n' +
+      summaryOf({ case: caseId, env: e }) + '\n≈ ' + dur(est) + (n.req != null ? t(' · ≈ {n} requests', { n: fmt(n.req) }) : '') + (n.peak ? t(' · peak ≈ {n} TPS', { n: num(n.peak) }) : '') + '\n' +
+      t('Dev / Platform: please stand by and watch Vercel function duration / errors, Firestore reads & writes and GCS.');
+    var cmdEnv = Object.keys(e).map(function (k) { return k + '=' + e[k]; });
+    $('cmd').textContent = cmdEnv.concat([caseId === 'ts01q' ? 'scripts/ts01-queue.sh ' + (e.ENDPOINTS || '') : caseId === 'check' ? 'k6 run scenarios/check.js' : caseId === 'tsall' ? 'scripts/ts-all.sh' : 'k6 run ' + c.label]).join(' \\\n  ');
+    $('runBtn').disabled = bad.length > 0;
+    $('runBtn').textContent = !typedTarget() ? t('Run') : t('Run on {t}…', { t: META.targets[target].label });
+    drawCalc();
+  }
+  function nowStamp() { var d = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return (LANG === 'th' ? ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])[d.getDay()] + ' ' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+  $('real').addEventListener('change', update); $('announced').addEventListener('change', update);
+
+  // ---------- typed confirmation (human-error guard for stg / prod) ----------
+  var modalCb = null;
+  function confirmTyped(t, intent, cb) {
+    var word = META.targets[t].word, label = META.targets[t].label;
+    $('modal').className = 'modal' + (t === 'stg' ? ' stg' : '');
+    $('mTitle').textContent = t2(intent === 'select' ? 'Switch target to {t}?' : 'Run on {t}?', { t: label });
+    $('mBody').innerHTML = intent === 'select'
+      ? t2('Runs from now on will send real load to <b>{base}</b>. You will be asked again before every run.', { base: esc(META.targets[t].base) })
+      : t2('About to start <b>{c}</b> against <b>{base}</b> for about <b>{d}</b>.', { c: esc(META.cases[caseId].label), base: esc(META.targets[t].base), d: dur(estimate(envNow())) });
+    $('mWord').textContent = word; $('mInput').value = ''; $('mOk').disabled = true; $('mList').hidden = false;
+    modalCb = cb; $('modal').hidden = false; setTimeout(function () { $('mInput').focus(); }, 0);
+  }
+  function closeModal(ok) {
+    var cb = modalCb, typed = $('mInput').value; modalCb = null; $('modal').hidden = true; $('mInput').value = '';
+    if (ok && cb) cb(typed);
+  }
+  $('mInput').addEventListener('input', function () { $('mOk').disabled = $('mInput').value !== $('mWord').textContent; });
+  $('mInput').addEventListener('paste', function (e) { e.preventDefault(); }); // type it, don't paste it
+  $('mInput').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !$('mOk').disabled) closeModal(true); });
+  $('mOk').onclick = function () { closeModal(true); };
+  $('mCancel').onclick = function () { closeModal(false); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('modal').hidden) closeModal(false); });
+  var pendingTarget = null;
+  // the same modal for the Test data actions: own title / text / word, no load-test checklist
+  function confirmWord(title, bodyHtml, word, danger, cb) {
+    $('modal').className = 'modal' + (danger ? '' : ' stg');
+    $('mTitle').textContent = title; $('mBody').innerHTML = bodyHtml; $('mList').hidden = true;
+    $('mWord').textContent = word; $('mInput').value = ''; $('mOk').disabled = true;
+    modalCb = cb; $('modal').hidden = false; setTimeout(function () { $('mInput').focus(); }, 0);
+  }
+
+  // ---------- run ----------
+  function run() {
+    $('err').textContent = '';
+    if (typedTarget()) return confirmTyped(target, 'run', function (typed) { start(typed); });
+    start(null);
+  }
+  function start(confirmText) {
+    var e = envNow();
+    var body = { case: caseId, target: target, env: e, confirmText: confirmText, estimateSec: estimate(e), real: typedTarget() && $('real').checked, announced: $('announced').checked };
+    api('/api/run', body).then(function (info) {
+      LIVE = []; liveLen = 0; liveTotal = null; liveFails = []; liveErrs = []; liveErrsMin = []; logLen = 0; $('log').textContent = ''; sheetShownFor = null;
+      lastInfo = info; exitView(); poll();
+    }).catch(function (x) { $('err').textContent = x.message; });
+  }
+  // ---------- local pmc-api checklist (status lights) and prepare ----------
+  var LOCALCHK = null, prepLen = 0, prepRunning = false, LOCAL_LABEL = {};
+  function loadLocal() {
+    if (!META || target !== 'local') { $('localBox').hidden = true; return; }
+    $('localBox').hidden = false; $('localChip').className = 'chip'; $('localChip').textContent = t('checking…');
+    api('/api/local/check').then(function (d) { LOCALCHK = d.checks; renderLocal(); })
+      .catch(function (x) { $('localNote').textContent = x.message; });
+  }
+  function renderLocal() {
+    if (!LOCALCHK) return;
+    var miss = LOCALCHK.filter(function (r) { return r.need && !r.ok; }), manual = miss.filter(function (r) { return !r.fix; });
+    $('localRows').innerHTML = LOCALCHK.map(function (r) {
+      var cls = !r.need ? '' : r.ok ? 'ok' : prepRunning ? 'run' : 'no';
+      var label = t(LOCAL_LABEL[r.key] || r.label);
+      var state = !r.need ? t('not needed for this run') : r.ok ? '' : r.fix ? t('missing → "prepare now" runs: {f}', { f: r.fix }) : t('missing — fix by hand');
+      return '<div class="row"><span class="dot ' + cls + '"></span><span>' + esc(label) + '</span><div class="det">' + esc(r.detail || '') + (state ? '<br>' + esc(state) : '') + '</div></div>';
+    }).join('');
+    $('localChip').className = 'chip' + (manual.length ? ' fail' : miss.length ? ' run' : ' pass');
+    $('localChip').textContent = manual.length ? t('fix by hand') : miss.length ? t('{n} to prepare', { n: miss.length }) : t('ready');
+    $('localNote').textContent = manual.length ? t('Run is blocked until the items marked "fix by hand" are done.')
+      : miss.length ? t('Press "prepare now" to boot the local app (scripts/local-stack.sh up: emulators → perf seed → production build → :3100; a few minutes the first time), then Run.') : '';
+    $('localPrep').disabled = prepRunning || !miss.some(function (r) { return r.fix; });
+  }
+  function prepPoll() {
+    api('/api/local/prepare/status?from=' + prepLen).then(function (s) {
+      if (s.log.length) { var el = $('localLog'); el.textContent = (prepLen ? el.textContent + '\n' : '') + s.log.join('\n'); prepLen = s.logLen; el.scrollTop = el.scrollHeight; }
+      var was = prepRunning; prepRunning = s.running;
+      if (s.info && !s.running && s.info.ok === false) $('err').textContent = t('local prepare stopped: see the prepare log');
+      renderLocal();
+      if (s.running) setTimeout(prepPoll, 1500);
+      else if (was) { loadLocal(); api('/api/meta').then(function (m) { META.data = m.data; update(); }); }
+    }).catch(function () { setTimeout(prepPoll, 3000); });
+  }
+  $('localRecheck').onclick = loadLocal;
+  $('localPrep').onclick = function () {
+    $('err').textContent = '';
+    api('/api/local/prepare', {}).then(function () { prepLen = 0; $('localLog').textContent = ''; $('localLogBox').open = true; prepRunning = true; renderLocal(); prepPoll(); })
+      .catch(function (x) { $('err').textContent = x.message; });
+  };
+  function hhmm(ts) { return hms(ts).slice(0, 5); }
+  function caseLabel(k) { return META.cases[k] ? META.cases[k].label : k || 'other'; }
+  function targetLabel(t) { return (META.targets[t] || {}).label || t || ''; }
+
+  // the run as a list of parts (step / endpoint / gap), from the same shape the scripts use
+  function planOf(cs, e) {
+    e = e || {};
+    var r = sec(e.PERF_RAMP || '30s'), h = sec(e.PERF_HOLD || '5m'), d = sec(e.PERF_RAMP_DOWN || '30s'), out = [];
+    var kinds = META.cases.ts01.fields[0].kinds || {};
+    // up / hold / down kept per part for the request estimate (requests ≈ rps × (up/2 + hold + down/2))
+    var ladder = function (name, rates, hold, id) {
+      rates.forEach(function (x, k) { var dn = k === rates.length - 1 ? d : 0; out.push({ part: (name ? name + ' · ' : '') + 's' + (k + 1), rps: x, sec: r + hold + dn, up: r, hold: hold, down: dn, ep: id }); });
+    };
+    var own = {}; String(e.TS01_RATES || '').split(',').forEach(function (x) { var a = x.split(':'); if (a.length === 2 && +a[1] > 0) own[a[0]] = +a[1]; });
+    var ts01rates = function (id) {
+      var st = String(e.PERF_STEPS || '').split(',').map(Number).filter(function (x) { return x > 0; });
+      return st.length ? st : [own[id] || +(e.PERF_RPS || ts01Dflt(id))];
+    };
+    var list = function (ids, gap) {
+      ids.forEach(function (id, k) {
+        ladder(id, ts01rates(id), h, id);
+        if (k < ids.length - 1) out.push({ part: t2('gap'), rps: null, sec: gap, gap: true });
+      });
+    };
+    var group = function (kind, gap) { list(Object.keys(kinds).filter(function (k) { return kinds[k] === kind && !heavyOf(k); }), gap); };
+    var one = function (part, rps, up, hold, down) { out.push({ part: part, rps: rps, sec: up + hold + down, up: up, hold: hold, down: down }); };
+    switch (cs) {
+      case 'smoke': out.push({ part: t2('smoke (every request path once)'), rps: null, sec: 30 }); break;
+      case 'ts01': ladder(e.PERF_ENDPOINT, ts01rates(e.PERF_ENDPOINT), h, e.PERF_ENDPOINT); break;
+      case 'ts01q': list(String(e.ENDPOINTS || '').split(',').filter(Boolean), +(e.TS01_GAP || 60)); break;
+      case 'check': String(e.ENDPOINTS || '').split(',').filter(Boolean).forEach(function (id, k, a) {
+        one(id, own[id] || +(e.PERF_RPS || 5), 0, sec(e.PERF_HOLD || '1s'), 0);
+        if (k < a.length - 1) out.push({ part: t2('gap'), rps: null, sec: +(e.CHECK_GAP || 1), gap: true });
+      }); break;
+      case 'stress': { var st = +e.PERF_STRESS_STEP || 50; for (var x = st, s = []; x <= (+e.PERF_STRESS_MAX || 1000); x += st) s.push(x); ladder('mix', s, sec(e.PERF_STRESS_HOLD || '5m')); break; }
+      case 'soak': one('mix', +(e.PERF_TARGET_RPS || mixTotal(e)), r, sec(e.PERF_SOAK_HOLD || '15m'), d); break;
+      case 'ts03': case 'ts04': one(caseLabel(cs), e.PERF_VUS ? null : +(e.PERF_TARGET_RPS || 50), r, h, d); break;
+      case 'spike': one('mix', +(e.PERF_SPIKE_RPS || mixTotal(e) * 2), sec(e.PERF_SPIKE_RAMP || '10s') * 2, h, d); break; // a 10 s jump ≈ 5 s at peak
+      case 'ts02': one(caseLabel(cs), +(e.PERF_ORDERS_PER_SEC || 10) * 2.3, r, h, d); break; // ≈ 2.3 requests per order
+      case 'auth': one(caseLabel(cs), +(e.PERF_LOGINS_PER_SEC || 2), r, h, d); break;
+      case 'tsall': {
+        var gap = +(e.TSALL_GAP || 60), parts = [];
+        // every TS: its own defaults, the shared shape from TSALL_RAMP / HOLD / RAMP_DOWN
+        r = sec(e.TSALL_RAMP || '30s'); h = sec(e.TSALL_HOLD || '5m'); d = sec(e.TSALL_RAMP_DOWN || '30s');
+        var byKind = { read: +e.TSALL_TS01_TPS || 0, auth: +e.TSALL_TS01_AUTH_TPS || 0, write: +e.TSALL_TS01_WRITE_TPS || 0 };
+        if (e.TSALL_TS01 !== '0') parts.push(function () { e = {}; Object.keys(kinds).forEach(function (id) { var x = byKind[kinds[id]]; if (x) own[id] = x; }); ['read', 'auth', 'write'].forEach(function (k, i) { if (i) out.push({ part: t2('gap'), rps: null, sec: 60, gap: true }); group(k, 60); }); });
+        ['TSALL_TS02', 'TSALL_TS03', 'TSALL_TS04'].forEach(function (k) { if (e[k] !== '0') { var c = 'ts0' + k.slice(-1); parts.push(function () { one(caseLabel(c), c === 'ts02' ? 10 * 2.3 : 50, r, h, d); }); } }); // each TS at its default load
+        parts.forEach(function (p, i) { if (i) out.push({ part: t2('gap between TSs'), rps: null, sec: gap, gap: true }); p(); });
+        break;
+      }
+      default: one(caseLabel(cs), null, r, h, d);
+    }
+    var t = 0; out.forEach(function (p) { p.at = t; t += p.sec; });
+    return out;
+  }
+  function clock(off) { var s = Math.round(off); return (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + String(Math.floor(s % 3600 / 60)).padStart(s >= 3600 ? 2 : 1, '0') + ':' + String(s % 60).padStart(2, '0'); }
+  // "Run plan" card: how the running run (else the selected scenario) runs and how it is judged
+  var calcOpen = false;
+  function drawCalc() {
+    var live = lastInfo && !lastInfo.done ? lastInfo : null, cs = live ? live.case : caseId, t0 = live ? live.startedAt : null;
+    var c = META.cases[cs], e = live ? live.env || {} : envNow(), at = function (off) { return t0 ? hms(t0 + off) : '+' + clock(off); }, plan = planOf(cs, e).filter(function (p) { return !p.gap; }), all = planOf(cs, e), end = all.length ? all[all.length - 1].at + all[all.length - 1].sec : 0;
+    $('calcBox').hidden = !!VIEW;
+    $('calcBox').innerHTML = '<details class="calc" id="calcDetails"' + (calcOpen ? ' open' : '') + '><summary>' + t(live ? 'Plan of the running run' : 'Run plan') + ' · ' + esc(c.label) + ' · ' + t(plan.length === 1 ? '{n} part' : '{n} parts', { n: plan.length }) + ' · ≈ ' + dur(end) + '</summary>' +
+      '<div class="note" style="margin:6px 0">' + (c.steady ? t('Each part: ramp up {r} → hold {h} → ramp down {d} (the ramp down only after the last step). PASS/FAIL per row over the whole run: p95 ≤ {p} ms and errors &lt; {e} %. Ladder steps are judged on their own window; a ladder stops when a step clearly breaks.', { r: esc(e.PERF_RAMP || '30s'), h: esc(e.PERF_HOLD || '5m'), d: esc(e.PERF_RAMP_DOWN || '30s'), p: META.gate.p95, e: META.gate.errPct }) : t('Strict: every check must pass; latency is reported, not gated.')) + ' ' + t(live ? 'Times are clock times of this run.' : 'Times are from the start of the run.') + ' ' + t('TPS = HTTP requests per second (1 request = 1 transaction).') + '</div>' +
+      '<div class="tw"><table class="errs"><thead><tr><th>#</th><th>' + t('Part') + '</th><th class="n">' + t('target TPS') + '</th><th class="n">' + t('starts') + '</th><th class="n">' + t('ends') + '</th><th class="n">' + t('length') + '</th></tr></thead><tbody>' +
+      plan.map(function (p, k) { return '<tr><td>' + (k + 1) + '</td><td><code>' + esc(p.part) + '</code></td><td class="n">' + (p.rps == null ? '–' : num(p.rps)) + '</td><td class="n">' + at(p.at) + '</td><td class="n">' + at(p.at + p.sec) + '</td><td class="n">' + dur(p.sec) + '</td></tr>'; }).join('') +
+      '</tbody></table></div></details>';
+  }
+  document.addEventListener('toggle', function (e) { if (e.target.id === 'calcDetails') calcOpen = e.target.open; }, true);
+
+  // one line describing a run, for the chat messages
+  function summaryOf(i) {
+    var e = i.env || {}, keys = Object.keys(e).filter(function (k) { return k !== 'ENDPOINTS' && k !== 'TS01_RATES'; });
+    var eps = String(e.ENDPOINTS || '').split(',').filter(Boolean), own = String(e.TS01_RATES || '').split(',').filter(Boolean);
+    return caseLabel(i.case) + (i.case === 'ts01q' || i.case === 'check' ? t(eps.length === 1 ? ' · {n} endpoint' : ' · {n} endpoints', { n: eps.length }) + (eps.length <= 4 ? ' (' + eps.join(', ') + ')' : '') + (own.length ? t(' · own rates ') + own.join(' ') : '') : '') + (keys.length ? ' · ' + keys.map(function (k) { return k.replace(/^PERF_/, '') + '=' + e[k]; }).join(' ') : t(' · default settings'));
+  }
+  function startMessage(i) {
+    var plan = planOf(i.case, i.env), lines = [t('Started {s} · run `{id}` · {t} ({base})', { s: i.start, id: i.runId, t: targetLabel(i.target), base: (META.targets[i.target] || {}).base || '' }), summaryOf(i)];
+    if (i.estimateSec) lines.push(t('Expected to finish ~{h} ({d})', { h: hhmm(i.startedAt + i.estimateSec), d: dur(i.estimateSec) }));
+    var named = plan.filter(function (p) { return !p.gap; });
+    if (named.length > 1) {
+      lines.push(t('Schedule:'));
+      // one line per endpoint / TS (a ladder's steps fold into one line)
+      var rows = [];
+      named.forEach(function (p) { var k = p.part.replace(/ · s\d+$/, ''), last = rows[rows.length - 1]; if (last && last.k === k) last.e = p.at + p.sec; else rows.push({ k: k, s: p.at, e: p.at + p.sec }); });
+      rows.forEach(function (x) { lines.push(hhmm(i.startedAt + x.s) + '–' + hhmm(i.startedAt + x.e) + '  ' + x.k); });
+    }
+    return lines.join('\n');
+  }
+
+  function renderInfo(i) {
+    var running = i && !i.done;
+    $('runBtn').hidden = running; $('stopBtn').hidden = !running;
+    if (VIEW) { $('viewRunning').hidden = !running; update(); return; }
+    $('chip').className = 'chip' + (!i ? '' : running ? ' run' : i.exit === 0 ? ' pass' : ' fail');
+    $('chip').textContent = !i ? t('idle') : running ? t(i.stopping ? 'stopping…' : 'running') : i.exit === 0 ? 'PASS' : t('FAIL (exit {n})', { n: i.exit });
+    var el = i ? Math.round((i.done && i.endedAt ? i.endedAt : Date.now() / 1000) - i.startedAt) : 0, left = i && i.estimateSec ? Math.max(0, i.estimateSec - el) : null;
+    $('runMeta').textContent = i ? i.runId + ' · ' + targetLabel(i.target) + ' · ' + (i.date ? i.date + ' ' : '') + t('started {s}', { s: i.start }) + (i.done ? t(' · finished {e}', { e: i.end || '' }) : t(' · {d} in', { d: dur(el) }) + (left != null ? t(' · ~{d} left', { d: dur(left) }) : '')) : '';
+    $('progBox').hidden = !i || !i.estimateSec;
+    if (i && i.estimateSec) $('prog').style.width = (i.done ? 100 : Math.min(100, el / i.estimateSec * 100)) + '%';
+    $('startBox').hidden = !i || !i.real;
+    if (i && i.real) $('startMsg').textContent = startMessage(i);
+    $('now').textContent = running ? nowText() : '';
+    if (i && i.done) {
+      renderResults(i.verdicts || [], i.runId, { end: i.end, stopping: i.stopping, target: i.target, info: i });
+      if (sheetShownFor !== i.runId) { sheetShownFor = i.runId; loadSheet(i.runId, true); }
+    } else { $('resultBox').hidden = true; $('peakBox').hidden = true; $('sheetBox').hidden = true; }
+    update();
+  }
+  // group runs (TS-01 Group Run / TS-All) print "[k/N] name" before each part
+  function nowText() {
+    var txt = $('log').textContent, m = null, x, re = /^=+ \[(\d+)\/(\d+)\] (.+?)(?:\s+·\s+|\s{2,})\d\d:\d\d:\d\d\s*$/gm, g = /^-+ gap (\d+)s/gm, lastGap = -1, lastPart = -1;
+    while ((x = re.exec(txt))) { m = x; lastPart = x.index; }
+    while ((x = g.exec(txt))) lastGap = x.index;
+    if (!m) return '';
+    var kind = t(lastInfo && lastInfo.case === 'tsall' ? 'TS' : 'endpoint');
+    return t('Now: {k} {i}/{n} · {name}', { k: kind, i: m[1], n: m[2], name: m[3] }) + (lastGap > lastPart ? t(' finished · gap before the next {k}', { k: kind }) : '');
+  }
+
+  // PASS/FAIL reason for a verdict row, from the two-metric gate
+  function whyOf(v) {
+    var w = [];
+    if (v.mode === 'check') return v.pass ? '' : (v.failed || []).join(' · '); // functional: latency is never a reason
+    // TS-01: none of the endpoint's own requests ran (login / prep failed) — the p95 / errors are the logins'
+    if (v.endpoint && v.measured === 0) return t('not measured: no {id} request ran — login / prep failed (see Error detail)', { id: v.endpoint });
+    if (v.p95 != null && v.p95 > META.gate.p95) w.push(t('p95 {v} > {g} ms', { v: fmt(v.p95), g: META.gate.p95 }));
+    if (v.errRate != null && v.errRate * 100 >= META.gate.errPct) w.push(t('errors {v} % ≥ {g} %', { v: num(v.errRate * 100), g: META.gate.errPct }));
+    if (v.mode === 'ladder') w.unshift(t('capacity within the gate {v}', { v: v.capacityRps ? num(v.capacityRps) + ' TPS' : t('none (failed from the first step)') }));
+    if (!w.length && !v.pass && v.failed.length) w.push(t('failed: {v}', { v: v.failed.join(', ') }));
+    return w.join(' · ');
+  }
+  function rowName(v) { return v.endpoint || v.scenario || '?'; }
+  // "Result" table + links + "Finished" message + details; for the latest run and past runs
+  function renderResults(vs, runId, o) {
+    o = o || {};
+    $('resultBox').hidden = false;
+    $('resRows').innerHTML = vs.length ? vs.map(function (v) {
+      return '<tr><td><b>' + esc(rowName(v)) + '</b>' + (v.mode ? ' <span class="small">' + esc(v.mode) + '</span>' : '') + '</td><td>' + esc(winText(v.window)) + '</td><td class="n">' + num(v.p95) + '</td><td class="n">' + (v.errRate == null ? '–' : num(v.errRate * 100)) +
+        '</td><td class="n">' + num(v.rps) + '</td><td><span class="chip ' + (v.pass ? 'pass' : 'fail') + '">' + (v.pass ? 'PASS' : 'FAIL') + '</span> <span class="small">' + esc(whyOf(v)) + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="6">' + t('No result files (verdict.json) · see the k6 log') + '</td></tr>';
+    if (o.stopping) $('resRows').innerHTML += '<tr><td colspan="6" class="note">' + t('⚠ Stopped part-way: the window is shorter than planned, so TPS and the target throughput read low. Do not use this run for the sheet.') + '</td></tr>';
+    if (!vs.length) $('logBox').open = true;
+    var F = {}; vs.forEach(function (v) { Object.keys(v.files || {}).forEach(function (k) { (F[k] = F[k] || []).push(v.files[k]); }); });
+    var lab = { '_report.html': t('open report'), '_report.png': t('report screenshot (attach in chat)'), '_results.csv': t('CSV for the sheet'), '_summary.json': t('k6 summary (JSON)') };
+    var links = Object.keys(lab).map(function (k) {
+      var f = F[k] || [];
+      if (!f.length) return k === '_report.png' ? '<span class="note">' + t('no screenshot (Google Chrome not found)') + '</span>' : '';
+      return f.length === 1 ? '<a href="/results/' + encodeURIComponent(f[0]) + '" target="_blank" rel="noopener">' + lab[k] + '</a>'
+        : '<span>' + lab[k] + ': ' + f.map(function (x, n) { return '<a href="/results/' + encodeURIComponent(x) + '" target="_blank" rel="noopener" title="' + esc(x) + '">' + (n + 1) + '</a>'; }).join(' ') + '</span>';
+    }).filter(Boolean);
+    if (vs.length) links.push('<span class="note">' + t('files are in results/{id}_*', { id: esc(runId) }) + '</span>');
+    $('links').innerHTML = vs.length ? links.join('') : '';
+    var nPass = vs.filter(function (v) { return v.pass; }).length;
+    $('endMsg').textContent = t('Finished {e} · run `{id}`', { e: o.end || '', id: runId }) + (o.info ? ' · ' + targetLabel(o.info.target) + ' · ' + summaryOf(o.info) : '') + '\n' +
+      'PASS ' + nPass + ' / FAIL ' + (vs.length - nPass) + (o.stopping ? t(' · stopped part-way') : '') + '\n\n' +
+      vs.map(function (v) { return (v.pass ? '✅ ' : '❌ ') + rowName(v) + ' · p95 ' + num(v.p95) + ' ms' + t(' · errors ') + (v.errRate == null ? '–' : num(v.errRate * 100)) + ' % · ' + num(v.rps) + ' TPS' + (whyOf(v) ? ' (' + whyOf(v) + ')' : ''); }).join('\n') +
+      '\n\n' + t('[attach the report screenshot]');
+    REPORT_TEXT = $('endMsg').textContent;
+    renderDetails(vs);
+    renderPeak(vs, runId);
+  }
+  function renderDetails(vs) {
+    $('results').innerHTML = vs.map(function (v) {
+      var h = '<div class="tw"><table><thead><tr><th>' + esc(v.scenario) + '</th><th>' + t('Window') + '</th><th class="n">' + t('Requests') + '</th><th class="n">TPS</th><th class="n">p95</th><th class="n">p99</th><th class="n">max</th><th class="n">' + t('errors') + '</th></tr></thead><tbody>' +
+        '<tr><td class="' + (v.pass ? 'ok' : 'no') + '">' + (v.pass ? 'PASS' : 'FAIL') + '</td><td>' + esc(winText(v.window)) + '</td><td class="n">' + fmt(v.requests) + '</td><td class="n">' + num(v.rps) +
+        '</td><td class="n">' + num(v.p95) + '</td><td class="n">' + num(v.p99) + '</td><td class="n">' + num(v.max) + '</td><td class="n">' + (v.errRate == null ? '–' : num(v.errRate * 100) + ' %') + '</td></tr></tbody></table></div>';
+      if (v.failed.length) h += '<div class="small no">' + t('Failed: ') + v.failed.map(esc).join(', ') + '</div>';
+      if (v.targetFloor) h += '<div class="small">' + t('Target throughput (reported, not gated): {n} of ≥ {f} requests at {r} TPS over the window — {m}', { n: fmt(v.requests), f: fmt(v.targetFloor), r: num(v.targetRps), m: t(v.targetMet ? 'met' : 'not met') }) + '</div>';
+      if (v.ordersPlaced != null) h += '<div class="small">' + t('orders placed: {n}', { n: fmt(v.ordersPlaced) }) + '</div>';
+      if (v.steps && v.steps.length) {
+        h += '<h3>' + esc(v.endpoint || '') + ' · ' + esc(v.mode || '') + (v.mode === 'ladder' ? t(' · capacity within gate: <b>{v} TPS</b>', { v: esc(v.capacityRps) }) : '') + '</h3><div class="tw"><table><thead><tr><th>' + t('Step') + '</th><th class="n">' + t('offered') + '</th><th class="n">' + t('achieved') + '</th><th class="n">n</th><th class="n">p95</th><th class="n">p99</th><th class="n">' + t('errors') + '</th><th>' + t('delivered') + '</th><th></th></tr></thead><tbody>' +
+          v.steps.map(function (s) { return '<tr><td>' + esc(s.phase) + '</td><td class="n">' + num(s.offered) + '</td><td class="n">' + num(s.achieved) + '</td><td class="n">' + fmt(s.count) + '</td><td class="n">' + num(s.p95) + '</td><td class="n">' + num(s.p99) + '</td><td class="n">' + num((s.errRate || 0) * 100) + ' %</td><td class="small">' + (s.delivered == null ? '–' : s.delivered ? '≥ 95 %' : '&lt; 95 %') + '</td><td class="' + (s.pass ? 'ok' : 'no') + '">' + (s.pass ? 'PASS' : 'FAIL') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      }
+      if (v.tags.length && !(v.steps && v.steps.length)) { // ladders: the step table is the per-step answer
+        h += '<h3>' + t('Per tag (slowest first)') + '</h3><div class="tw"><table><thead><tr><th>Tag</th><th class="n">n</th><th class="n">p95</th><th class="n">p99</th><th class="n">max</th></tr></thead><tbody>' +
+          v.tags.slice(0, 20).map(function (t) { return '<tr><td><code>' + esc(t.tag) + '</code></td><td class="n">' + fmt(t.count) + '</td><td class="n ' + (t.p95 > META.gate.p95 ? 'no' : '') + '">' + num(t.p95) + '</td><td class="n">' + num(t.p99) + '</td><td class="n">' + num(t.max) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      }
+      return h;
+    }).join('<hr class="sep">');
+  }
+
+  // ---------- Peak (runs with several steps: TS-01 ladder, Stress) ----------
+  function renderPeak(vs, runId) {
+    var list = vs.filter(function (v) { return v.steps && v.steps.length > 1; });
+    $('peakBox').hidden = !list.length;
+    if (!list.length) return;
+    var gate = META.gate.p95;
+    $('peakTitle').textContent = t('Peak · {id}', { id: runId });
+    $('peakRows').innerHTML = list.map(function (v) {
+      var st = v.steps, best = null, broke = null, knee = null;
+      for (var k = 0; k < st.length; k++) { if (st[k].pass && !broke) best = st[k]; else if (!st[k].pass && !broke) broke = st[k]; }
+      for (var j = 0; j + 1 < st.length; j++) if (st[j].p95 != null && st[j + 1].p95 != null && st[j].p95 <= gate && st[j + 1].p95 > gate) {
+        var a = st[j], b = st[j + 1]; knee = { lo: a.offered, hi: b.offered, loP: a.p95, hiP: b.p95, est: a.offered + (b.offered - a.offered) * (gate - a.p95) / (b.p95 - a.p95) }; break;
+      }
+      var peak = best ? '<b>' + num(best.offered) + ' TPS</b><div class="note">' + t('step {p} · achieved {a} · p95 {v} ms · errors {e} %', { p: esc(best.phase), a: num(best.achieved), v: num(best.p95), e: num((best.errRate || 0) * 100) }) + '</div>' : '<span class="chip fail">' + t('failed from the first step') + '</span>';
+      var why = broke ? [broke.p95 > gate ? t('p95 {v} ms', { v: num(broke.p95) }) : '', (broke.errRate || 0) * 100 >= META.gate.errPct ? t('errors {v} %', { v: num(broke.errRate * 100) }) : '', broke.delivered === false ? t('achieved {a} of {o} TPS', { a: num(broke.achieved), o: num(broke.offered) }) : ''].filter(Boolean).join(' · ') : '';
+      var brk = broke ? '<b>' + num(broke.offered) + ' TPS</b> <span class="note">' + t('(step {p})', { p: esc(broke.phase) }) + '</span><div class="note">' + esc(why || t('failed the gate')) + (st.indexOf(broke) === st.length - 1 && st.length < (v.plannedSteps || st.length) ? t(' · ladder stopped here') : '') + '</div>' : '<span class="note">' + t('did not break within the steps run') + '</span>';
+      var safe = best ? Math.min(best.offered, broke ? broke.offered * 0.8 : Infinity) : null;
+      var rec = safe ? '<b>≤ ' + num(safe) + ' TPS</b><div class="note">' + t(broke && safe < best.offered ? '80 % of the breaking step (the last passing step is too close to it)' : 'the last step that passed') + '</div>' : '–';
+      var kn = knee ? num(knee.lo) + '–' + num(knee.hi) + ' TPS <div class="note">≈ ' + num(knee.est) + ' (p95 ' + num(knee.loP) + ' → ' + num(knee.hiP) + ' ms)</div>' : '<span class="note">' + t(st.every(function (s) { return s.p95 != null && s.p95 <= gate; }) ? 'p95 under the gate at every step' : 'p95 over the gate from the first step') + '</span>';
+      return '<tr><td><b>' + esc(rowName(v)) + '</b><div class="note">' + t('gate p95 ≤ {g} ms', { g: gate }) + '</div></td><td>' + peak + '</td><td class="msg">' + brk + '</td><td class="msg">' + rec + '</td><td>' + kn + '</td></tr>';
+    }).join('');
+  }
+
+  // ---------- rows for the results sheet (results.csv) ----------
+  var SHEET = { head: [], rows: [] }, REPORT_TEXT = '', sheetShownFor = null;
+  function col(k) { var s = ''; k++; while (k > 0) { var m = (k - 1) % 26; s = String.fromCharCode(65 + m) + s; k = Math.floor((k - 1) / 26); } return s; }
+  function renderSheet(d, runId) {
+    SHEET = d || { head: [], rows: [] };
+    $('sheetBox').hidden = !SHEET.rows.length;
+    if (!SHEET.rows.length) return;
+    var pf = SHEET.head.indexOf('PASS/FAIL');
+    $('sheetTitle').textContent = t(SHEET.rows.length === 1 ? 'Rows for the results sheet · {id} · {n} row' : 'Rows for the results sheet · {id} · {n} rows', { id: runId, n: SHEET.rows.length });
+    $('sheetHead').innerHTML = '<tr>' + SHEET.head.map(function (c, k) { return '<th>' + col(k) + '<small>' + esc(c) + '</small></th>'; }).join('') + '</tr>';
+    $('sheetRows').innerHTML = SHEET.rows.map(function (r) {
+      return '<tr>' + r.map(function (v, k) { return k === pf ? '<td><span class="chip ' + (v === 'PASS' ? 'pass' : 'fail') + '">' + esc(v) + '</span></td>' : '<td' + (/^-?[\d.]+$/.test(v) ? ' class="n"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>';
+    }).join('');
+  }
+  function loadSheet(runId, quiet) {
+    api('/api/sheet?run=' + encodeURIComponent(runId)).then(function (d) { renderSheet(d, runId); if (d.rows.length && !quiet) $('sheetBox').scrollIntoView({ behavior: 'smooth', block: 'start' }); }).catch(function () {});
+  }
+  function tsv(rows) { return rows.map(function (r) { return r.map(function (c) { return String(c).replace(/[\t\n]/g, ' '); }).join('\t'); }).join('\n'); }
+  function copyText(btn, text) {
+    var old = btn.textContent;
+    navigator.clipboard.writeText(text).then(function () { btn.textContent = t('copied ✓'); setTimeout(function () { btn.textContent = old; }, 1400); });
+  }
+  $('copyRows').onclick = function () { copyText(this, tsv(SHEET.rows)); };
+  $('copyHead').onclick = function () { copyText(this, tsv([SHEET.head].concat(SHEET.rows))); };
+  $('copyReport').onclick = function () { copyText(this, REPORT_TEXT); };
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-copy]'); if (!b) return;
+    navigator.clipboard.writeText($(b.dataset.copy).textContent).then(function () { b.textContent = t('copied'); setTimeout(function () { b.textContent = t('copy'); }, 1200); });
+  });
+
+  // ---------- live charts ----------
+  // target TPS for a second, from the phase tag (sN = Nth step) and the run's settings
+  function targetOf(info, ph, ep) {
+    if (!info || !ph || !/^s\d+$/.test(ph)) return null;
+    var e = info.env || {}, i = +ph.slice(1) - 1, steps = String(e.PERF_STEPS || '').split(',').map(Number).filter(function (x) { return x > 0; });
+    switch (info.case) {
+      case 'ts01': case 'ts01q': {
+        var kinds = META.cases.ts01.fields[0].kinds || {}, id = info.case === 'ts01' ? e.PERF_ENDPOINT : ep, own = null;
+        String(e.TS01_RATES || '').split(',').forEach(function (x) { var a = x.split(':'); if (a[0] === id && +a[1] > 0) own = +a[1]; });
+        return steps.length ? steps[i] : own || +(e.PERF_RPS || ts01Dflt(id));
+      }
+      case 'soak': return +(e.PERF_TARGET_RPS || mixTotal(e));
+      case 'ts03': case 'ts04': return e.PERF_VUS ? null : +(e.PERF_TARGET_RPS || 50);
+      case 'ts02': return +(e.PERF_ORDERS_PER_SEC || 10) * 2.3;
+      case 'auth': return +(e.PERF_LOGINS_PER_SEC || 2);
+      case 'stress': return (+e.PERF_STRESS_STEP || 50) * (i + 1);
+      case 'spike': return +(e.PERF_SPIKE_RPS || mixTotal(e) * 2);
+      default: return null;
+    }
+  }
+  function avg(a) { var s = 0, n = 0; a.forEach(function (x) { if (x != null) { s += x; n++; } }); return n ? s / n : null; }
+  function drawLive() {
+    var S = VIEW ? VIEW.series : LIVE, info = VIEW ? VIEW.info : lastInfo;
+    $('liveBox').hidden = !S.length; $('emptyBox').hidden = !!S.length || !!VIEW;
+    if (!S.length) return;
+    var xs = [], rps = [], ra = [], p50 = [], p95 = [], tr = [], gate = [], band = [];
+    S.forEach(function (p, k) {
+      xs.push(p.t); rps.push(p.n); p50.push(p.p50); p95.push(p.p95); tr.push(p.sg === 'hold' ? targetOf(info, p.ph, p.ep) : null);
+      gate.push(META.gate.p95); band.push(p.sg === 'hold');
+      ra.push(avg(S.slice(Math.max(0, k - 4), k + 1).map(function (q) { return q.n; })));
+    });
+    var groups = [['2xx', '--s2'], ['3xx', '--s3'], ['4xx', '--s4'], ['5xx', '--s5'], ['0', '--s0']];
+    var bars = groups.map(function (g) {
+      return { label: g[0] === '0' ? t('no response') : g[0], color: css(g[1]), vals: S.map(function (p) {
+        var s = 0; Object.keys(p.st).forEach(function (c) { if ((c === '0' ? '0' : c[0] + 'xx') === g[0]) s += p.st[c]; }); return s;
+      }) };
+    }).filter(function (b) { return b.vals.some(function (v) { return v > 0; }); });
+    var tip = function (k) { return hms(xs[k]) + (S[k].ph ? ' · ' + S[k].ph : '') + (S[k].ep ? ' · ' + S[k].ep : ''); };
+    chart('ch0', 'lg0', { xs: xs, tip: tip, band: band, unit: ' TPS', lines: [
+      { label: t('per second'), vals: rps, color: css('--c2'), width: 1 },
+      { label: t('5 s average'), vals: ra, color: css('--c1'), width: 2 },
+      { label: t('target'), vals: tr, color: css('--c-gate'), dash: true, width: 1.5 }] });
+    chart('ch1', 'lg1', { xs: xs, tip: tip, band: band, unit: ' ms', lines: [
+      { label: 'p50', vals: p50, color: css('--c2'), width: 1 },
+      { label: 'p95', vals: p95, color: css('--c1'), width: 2 },
+      { label: t('p95 gate {g}', { g: META.gate.p95 }), vals: gate, color: css('--c-gate'), dash: true, width: 1.5, soft: true }] });
+    chart('ch2', 'lg2', { xs: xs, band: band, unit: '', bars: bars, tip: function (k) {
+      var st = S[k].st, c = Object.keys(st).sort().map(function (x) { return x + ': ' + st[x]; }).join(' · ');
+      return tip(k) + (c ? ' · ' + c : t(' · no requests'));
+    } });
+    drawKpis(S, info);
+    // classified errors (lib/errors.js) when present, else failures by tag + status
+    var errs = (VIEW ? VIEW.errs : liveErrs) || [], fails = (VIEW ? VIEW.fails : liveFails) || [];
+    var mins = (VIEW ? VIEW.errsMin : liveErrsMin) || [];
+    var list = errs.length ? errs : fails.map(function (f) { return { name: f.name, status: f.status, code: '', src: '', msg: '', n: f.n, first: f.first, last: f.last }; });
+    var srcTag = function (s) { return s ? '<span class="src ' + esc(s) + '" title="' + esc(t(SRC_NOTE[s] || '')) + '">' + esc(SRC[s] ? t(SRC[s]) : s) + '</span>' : ''; };
+    $('failBox').hidden = !list.length;
+    $('failRows').innerHTML = list.slice(0, 30).map(function (f) {
+      return '<tr><td><code>' + esc(f.name) + '</code></td><td class="n">' + esc(f.status) + '</td><td><code>' + esc(f.code) + '</code></td><td>' + srcTag(f.src) + '</td><td class="msg small">' + esc(f.msg) + '</td><td class="n">' + fmt(f.n) + '</td><td>' + hms(f.first) + (f.last !== f.first ? '–' + hms(f.last) : '') + '</td></tr>';
+    }).join('');
+    $('failNote').textContent = (list.length > 30 ? t('first 30 of {n} kinds · ', { n: list.length }) : '') + t('status 0 = no response (timeout / connection error) · Vercel edge = the platform answered, not the app · tags starting with prep. are setup steps (login, fixtures), not the measured call · run Smoke with "Print failures" to see bodies');
+    $('minBox').hidden = !mins.length;
+    $('minRows').innerHTML = mins.slice(-60).map(function (x) {
+      return '<tr><td>' + hhmm(x.t) + '</td><td><code>' + esc(x.name) + '</code></td><td class="n">' + esc(x.status) + '</td><td><code>' + esc(x.code) + '</code></td><td>' + srcTag(x.src) + '</td><td class="n">' + fmt(x.n) + '</td></tr>';
+    }).join('');
+  }
+  var SRC = { vercel: 'Vercel edge', backend: 'pmc-line route', network: 'network / k6', other: 'other' };
+  var SRC_NOTE = { vercel: 'the platform answered, not the app (timeout 504, payload 413, WAF, 502)', backend: 'the app\'s own error envelope', network: 'no response', other: '' };
+  function drawKpis(S, info) {
+    var last = S.slice(-10), n = 0, fail = 0, pw = 0, drop = 0, vus = null, ph = null, sg = null, ep = null;
+    last.forEach(function (p) { n += p.n; fail += p.fail; pw += (p.p95 || 0) * p.n; });
+    S.forEach(function (p) { drop += p.drop || 0; if (p.vus != null) vus = p.vus; });
+    for (var k = S.length - 1; k >= Math.max(0, S.length - 10); k--) { if (!ph && S[k].ph) ph = S[k].ph; if (!sg && S[k].sg) sg = S[k].sg; if (!ep && S[k].ep) ep = S[k].ep; }
+    var rps = n / Math.max(1, last.length), p95 = n ? pw / n : null, err = n ? fail / n * 100 : null, tgt = targetOf(info, ph, ep);
+    var T = (VIEW ? VIEW.total : liveTotal) || { n: 0, fail: 0, st: {} }, errAll = T.n ? T.fail / T.n * 100 : null;
+    var done = VIEW || (info && info.done), w = t('last 10 s');
+    var tile = function (l, v, s, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>'; };
+    $('kpis').innerHTML =
+      tile('TPS · ' + w, num(rps), tgt ? t('target {v}', { v: num(tgt) }) + (sg === 'hold' ? '' : t(' (at hold)')) : '&nbsp;', tgt && !done && sg === 'hold' ? (rps >= tgt * 0.95 ? 'good' : '') : '') +
+      tile('p95 · ' + w, p95 == null ? '–' : fmt(p95) + '<small style="font-size:12px"> ms</small>', t('gate ≤ {g} ms', { g: META.gate.p95 }), p95 == null ? '' : p95 > META.gate.p95 ? 'bad' : 'good') +
+      tile(t('errors') + ' · ' + w, err == null ? '–' : num(err) + ' %', t('gate &lt; {g} % (incl. &gt; {s} s) · whole run {a}', { g: META.gate.errPct, s: META.gate.slowMs / 1000, a: errAll == null ? '–' : num(errAll) + ' %' }), err == null ? '' : err >= META.gate.errPct ? 'bad' : 'good') +
+      tile(t('requests'), fmt(T.n), t('failed {n}', { n: fmt(T.fail) })) +
+      tile(t('VUs'), vus == null ? '–' : fmt(vus), t('dropped {n}', { n: fmt(drop) }), drop > 0 ? 'bad' : '') +
+      tile(t('stage'), sg ? sg + (ph && ph !== 's1' ? ' · ' + ph : '') : '–', ep || (done ? t('finished') : '&nbsp;'));
+    var st = T.st || {};
+    $('codes').innerHTML = Object.keys(st).sort().map(function (c) { return '<span class="c' + (c === '0' ? '0' : c[0]) + '">' + (c === '0' ? t('no response') : c) + ': ' + fmt(st[c]) + '</span>'; }).join('');
+  }
+
+  // canvas line / stacked-bar chart with steady-window band and hover tooltip
+  function chart(id, lid, o) {
+    var cv = $(id); cv._o = o;
+    var leg = (o.lines || o.bars).map(function (s) { return '<span><i class="' + (s.dash ? 'dash' : '') + '" style="background:' + s.color + ';color:' + s.color + '"></i>' + esc(s.label) + '</span>'; });
+    if (o.band && o.band.some(Boolean)) leg.push('<span><i class="band" style="background:' + css('--steady') + '"></i>' + t('hold (ramps measured too)') + '</span>');
+    $(lid).innerHTML = leg.join('');
+    paint(cv, null);
+  }
+  function niceMax(v) { var p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+  function shortNum(v) { return v >= 1000 ? (Math.round(v / 100) / 10) + 'k' : String(Math.round(v * 10) / 10); }
+  function paint(cv, hover) {
+    var o = cv._o; if (!o) return;
+    var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    var L = 44, R = 8, T = 6, B = 18, pw = W - L - R, ph = H - T - B, n = o.xs.length, max = 0, over = null;
+    (o.lines || []).forEach(function (s) { if (!s.soft) s.vals.forEach(function (v) { if (v != null && v > max) max = v; }); });
+    if (o.bars) for (var k = 0; k < n; k++) { var sm = 0; o.bars.forEach(function (b) { sm += b.vals[k]; }); if (sm > max) max = sm; }
+    // gate lines count toward the scale only when within 2× of the data; else a label at the top
+    (o.lines || []).forEach(function (s) { if (s.soft) s.vals.forEach(function (v) { if (v == null) return; if (v <= Math.max(max, 1) * 2) { if (v > max) max = v; } else over = over || s; }); });
+    max = niceMax(max * 1.1 || 1);
+    var y = function (v) { return T + ph - v / max * ph; }, x = function (k) { return L + (n <= 1 ? pw / 2 : k / (n - 1) * pw); };
+    if (o.band) { g.fillStyle = css('--steady'); for (var b = 0; b < n; b++) if (o.band[b]) g.fillRect(L + b * pw / Math.max(1, n), T, Math.ceil(pw / Math.max(1, n)) + 1, ph); }
+    g.font = '10.5px -apple-system,Segoe UI,sans-serif'; g.fillStyle = css('--muted'); g.strokeStyle = css('--line'); g.lineWidth = 1;
+    g.textAlign = 'right'; g.textBaseline = 'middle';
+    for (var t = 0; t <= 4; t++) { var v = max * t / 4, yy = Math.round(y(v)) + 0.5; g.beginPath(); g.moveTo(L, yy); g.lineTo(W - R, yy); g.stroke(); g.fillText(shortNum(v), L - 6, yy); }
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    var ticks = Math.min(6, n), lastX = -1e9;
+    for (var q = 0; q < ticks; q++) { var kk = ticks === 1 ? 0 : Math.round(q * (n - 1) / (ticks - 1)), xx = x(kk); if (xx - lastX < 50) continue; lastX = xx; g.fillText(hms(o.xs[kk]).slice(0, n > 600 ? 5 : 8), Math.min(W - R - 20, Math.max(L + 20, xx)), T + ph + 4); }
+    if (o.bars) {
+      var bw = Math.max(1, pw / Math.max(1, n) - (n < 120 ? 1 : 0));
+      for (var i = 0; i < n; i++) { var base = 0; o.bars.forEach(function (bb) { var v2 = bb.vals[i]; if (!v2) return; g.fillStyle = bb.color; g.fillRect(L + i * pw / Math.max(1, n), y(base + v2), bw, y(base) - y(base + v2)); base += v2; }); }
+    }
+    (o.lines || []).forEach(function (s) {
+      g.strokeStyle = s.color; g.lineWidth = s.width || 1.5; g.setLineDash(s.dash ? [5, 4] : []); g.beginPath();
+      var pen = false;
+      s.vals.forEach(function (v, k) { if (v == null || v > max) { pen = false; return; } if (pen) g.lineTo(x(k), y(v)); else { g.moveTo(x(k), y(v)); pen = true; } });
+      g.stroke(); g.setLineDash([]);
+    });
+    if (over) { g.fillStyle = over.color; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText(t2('↑ {l} ms (above the chart)', { l: over.label }), W - R - 2, T + 2); }
+    if (hover != null && n) { var hx = o.bars ? L + (hover + 0.5) * pw / n : x(hover); g.strokeStyle = css('--muted'); g.beginPath(); g.moveTo(hx, T); g.lineTo(hx, T + ph); g.stroke(); }
+  }
+  document.addEventListener('mousemove', function (e) {
+    var cv = e.target.closest && e.target.closest('canvas');
+    document.querySelectorAll('.tip').forEach(function (t) { if (!cv || t.parentNode !== cv.parentNode) t.remove(); });
+    document.querySelectorAll('canvas').forEach(function (c) { if (c !== cv && c._h != null) { c._h = null; paint(c, null); } });
+    if (!cv || !cv._o || !cv._o.xs.length) return;
+    var o = cv._o, r = cv.getBoundingClientRect(), n = o.xs.length, pw = r.width - 52;
+    var k = o.bars ? Math.floor((e.clientX - r.left - 44) / pw * n) : Math.round((e.clientX - r.left - 44) / pw * (n - 1));
+    k = Math.max(0, Math.min(n - 1, k));
+    if (cv._h !== k) { cv._h = k; paint(cv, k); }
+    var tip = cv.parentNode.querySelector('.tip') || cv.parentNode.appendChild(Object.assign(document.createElement('div'), { className: 'tip' }));
+    var vals = (o.lines || []).filter(function (s) { return !s.soft; }).map(function (s) { return s.label + ' ' + (s.vals[k] == null ? '–' : num(s.vals[k]) + o.unit); }).join(' · ');
+    tip.textContent = o.tip(k) + (vals ? ' · ' + vals : '');
+    var px = e.clientX - cv.parentNode.getBoundingClientRect().left + 12;
+    tip.style.left = Math.min(px, cv.parentNode.clientWidth - tip.offsetWidth - 4) + 'px'; tip.style.top = '28px';
+  });
+  window.addEventListener('resize', function () { document.querySelectorAll('canvas').forEach(function (c) { paint(c, null); }); });
+
+  // ---------- history / replay ----------
+  // filter by scenario: the selected tab ('tab'), everything ('all') or one scenario; grouped by day
+  var HIST = [], histFilter = 'tab';
+  function loadHistory() { api('/api/history').then(function (h) { HIST = h; drawHistory(); }); }
+  function drawHistory() {
+    var cur = histFilter === 'tab' ? caseId : histFilter, counts = {};
+    HIST.forEach(function (x) { var k = x.case || 'other'; counts[k] = (counts[k] || 0) + 1; });
+    var order = Object.keys(META.cases).concat(['other']).filter(function (k) { return counts[k]; });
+    $('histBar').innerHTML = '<button type="button" data-hf="tab" aria-pressed="' + (histFilter === 'tab') + '">' + t('selected tab ({c} · {n})', { c: esc(caseLabel(caseId)), n: counts[caseId] || 0 }) + '</button>' +
+      '<button type="button" data-hf="all" aria-pressed="' + (histFilter === 'all') + '">' + t('all ({n})', { n: HIST.length }) + '</button>' +
+      order.map(function (k) { return '<button type="button" data-hf="' + k + '" aria-pressed="' + (histFilter === k) + '">' + esc(caseLabel(k)) + ' (' + counts[k] + ')</button>'; }).join('');
+    var rows = HIST.filter(function (x) { return cur === 'all' || (x.case || 'other') === cur; }), lastDay = null, out = [];
+    rows.forEach(function (x) {
+      var day = x.time.slice(0, 10);
+      if (day !== lastDay) { out.push('<tr class="day"><td colspan="7">' + esc(day) + '</td></tr>'); lastDay = day; }
+      var b = '/results/' + encodeURIComponent(x.runId), rep = x.report ? '/results/' + encodeURIComponent(x.report) : null;
+      out.push('<tr><td>' + esc(x.time.slice(11)) + '</td><td><span class="chip">' + esc(caseLabel(x.case || 'other')) + '</span></td><td>' + (rep ? '<a href="' + rep + '" target="_blank" rel="noopener">' + esc(x.runId) + '</a>' : '<code>' + esc(x.runId) + '</code>') + '</td>' +
+        '<td class="' + (x.verdicts ? (x.pass ? 'ok' : 'no') : '') + '">' + (x.verdicts ? (x.pass ? 'PASS' : 'FAIL') : '–') + '</td>' +
+        '<td>' + (x.png && rep ? '<a href="' + rep.replace(/_report\.html$/, '_report.png') + '" target="_blank" rel="noopener">' + t('screenshot') + '</a>' : '') + '</td>' +
+        '<td>' + (x.live || x.verdicts ? '<a href="#" data-view="' + esc(x.runId) + '">' + t(x.live ? 'charts' : 'result') + '</a>' : '<span class="note">' + t('no charts') + '</span>') + '</td>' +
+        '<td>' + (x.csv ? '<a href="#" data-sheet="' + esc(x.runId) + '">' + t('rows for sheet') + '</a>' : '') + '</td></tr>');
+    });
+    $('hist').innerHTML = out.length ? out.join('') : '<tr><td class="note">' + t(HIST.length ? 'No runs of this scenario yet · press "all" to see every run' : 'No runs in results/ yet.') + '</td></tr>';
+  }
+  function viewRun(rid) {
+    Promise.all([api('/api/live?run=' + encodeURIComponent(rid)).catch(function () { return null; }), api('/api/verdicts?run=' + encodeURIComponent(rid))]).then(function (r) {
+      var lv = r[0] || { series: [], total: null, fails: [], info: { runId: rid } };
+      VIEW = { series: lv.series || [], total: lv.total, fails: lv.fails || [], errs: lv.errs || [], errsMin: lv.errsMin || [], info: lv.info || { runId: rid } };
+      var inf = VIEW.info || {};
+      $('viewBar').hidden = false; $('viewRunning').hidden = !(lastInfo && !lastInfo.done);
+      $('viewTxt').textContent = t('Past run · {id}', { id: rid }) + (inf.date ? ' · ' + inf.date : '') + (inf.start ? ' ' + inf.start + '–' + (inf.end || '') : '') + (inf.case ? ' · ' + summaryOf(inf) : '') + (lv.series && lv.series.length ? '' : t(' (no charts saved for this run)'));
+      $('cardTitle').textContent = t('Selected run (past)');
+      var vs = r[1] || [], ok = vs.length && vs.every(function (v) { return v.pass; });
+      $('chip').className = 'chip' + (vs.length ? (ok ? ' pass' : ' fail') : '');
+      $('chip').textContent = vs.length ? (ok ? 'PASS' : 'FAIL') : t('no verdict');
+      $('runMeta').textContent = rid + (inf.target ? ' · ' + targetLabel(inf.target) : '') + (inf.start ? ' · ' + (inf.date ? inf.date + ' ' : '') + inf.start + (inf.end ? '–' + inf.end : '') : '');
+      $('progBox').hidden = true; $('startBox').hidden = true; $('now').textContent = ''; $('calcBox').hidden = true;
+      renderResults(vs, rid, { end: inf.end, info: inf.case ? inf : null });
+      loadSheet(rid, true);
+      drawLive();
+      $('viewBar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  function exitView() {
+    VIEW = null; $('viewBar').hidden = true; $('cardTitle').textContent = t('Latest run'); sheetShownFor = null;
+    if (!lastInfo) { $('resultBox').hidden = true; $('peakBox').hidden = true; $('sheetBox').hidden = true; }
+    renderInfo(lastInfo); drawLive();
+  }
+
+  // ---------- polling ----------
+  var wasRunning = false, loadedFor = null;
+  function poll() {
+    api('/api/status?from=' + logLen).then(function (s) {
+      if (s.log.length) { var el = $('log'); var atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 20; el.textContent = (logLen ? el.textContent + '\n' : '') + s.log.join('\n'); logLen = s.logLen; if (atEnd) el.scrollTop = el.scrollHeight; }
+      if (s.info) { lastInfo = s.info; renderInfo(s.info); }
+      // page opened (or reloaded) after the latest run finished: load its saved series once
+      if (!s.running && !wasRunning && s.info && s.info.done && !LIVE.length && loadedFor !== s.info.runId) {
+        loadedFor = s.info.runId;
+        api('/api/live?run=' + encodeURIComponent(s.info.runId)).then(function (l) {
+          LIVE = l.series || []; liveLen = LIVE.length; liveTotal = l.total; liveFails = l.fails || []; liveErrs = l.errs || []; liveErrsMin = l.errsMin || [];
+          if (!VIEW) drawLive();
+        }).catch(function () {});
+      }
+      if (s.running || wasRunning) {
+        api('/api/live?from=' + liveLen).then(function (l) {
+          LIVE = LIVE.concat(l.series || []); liveLen = l.len; liveTotal = l.total; liveFails = l.fails || []; liveErrs = l.errs || []; liveErrsMin = l.errsMin || [];
+          if (!VIEW) drawLive();
+        });
+      }
+      if (wasRunning && !s.running) loadHistory();
+      wasRunning = s.running;
+    }).catch(function () {}).then(function () { setTimeout(poll, 1000); });
+  }
+
+  // ---------- wiring ----------
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-t]'), c = e.target.closest('[data-c]'), v = e.target.closest('[data-view]'), sh = e.target.closest('[data-sheet]'), hf = e.target.closest('[data-hf]');
+    if (t && t.dataset.t !== target) {
+      var nt = t.dataset.t;
+      if (!META.targets[nt].word) { target = nt; renderTargets(); loadLastPass(); update(); } // mock / local: nothing to confirm
+      else { pendingTarget = nt; confirmTyped(nt, 'select', function () { target = nt; pendingTarget = null; renderTargets(); loadLastPass(); update(); }); }
+    }
+    if (c) { $('real').checked = !!META.cases[c.dataset.c].steady; $('announced').checked = false; caseId = c.dataset.c; history.replaceState(null, '', '#' + caseId); renderTabs(); renderForm(); update(); drawHistory(); loadLocal(); }
+    if (v) { e.preventDefault(); viewRun(v.dataset.view); }
+    if (sh) { e.preventDefault(); loadSheet(sh.dataset.sheet); }
+    if (hf) { histFilter = hf.dataset.hf; drawHistory(); }
+    var lg = e.target.closest('[data-lang]'); if (lg && lg.dataset.lang !== LANG) setLang(lg.dataset.lang);
+    var bk = e.target.closest('[data-bulk]'); if (bk && !bk.disabled) bulkRate(bk.dataset.bulk);
+    var pk = e.target.closest('[data-pick]'), ul = e.target.closest('[data-uselast]');
+    if (pk) {
+      var kinds = kindsAll(), w = pk.dataset.pick;
+      setVal('ENDPOINTS', w === 'none' ? ',' : Object.keys(kinds).filter(function (id) { return w === 'all' || (w === 'focus' ? focusOf(id) : w === 'nodb' ? dbOf(id) !== 'write' : w === 'heavy' ? heavyOf(id) : w === 'read' ? kinds[id] === 'read' && !heavyOf(id) : kinds[id] === w); }).join(','));
+      renderForm(); update();
+    }
+    if (ul && isList()) {
+      document.querySelectorAll('[data-rate]').forEach(function (inp) { var lp = LASTPASS[inp.dataset.rate]; if (lp) inp.value = lp.rps; });
+      readEps(); renderForm(); update();
+    } else if (ul && caseId === 'ts01') { var lp = LASTPASS[val('PERF_ENDPOINT')]; if (lp) { setVal('PERF_RPS', String(lp.rps)); setVal('PERF_STEPS', ''); renderForm(); update(); } }
+  });
+  document.addEventListener('input', function (e) { if (e.target.dataset && e.target.dataset.rate) { readEps(); update(); } if (e.target.id === 'bulkTps') BULK = e.target.value; });
+  document.addEventListener('keydown', function (e) { if (e.target.id === 'bulkTps' && e.key === 'Enter') { e.preventDefault(); bulkRate('set'); } });
+  document.addEventListener('change', function (e) { if (e.target.dataset && e.target.dataset.ep) { readEps(); renderForm(); update(); } });
+  document.addEventListener('input', function (e) {
+    if (e.target.id && e.target.id.indexOf('f_') === 0 && !(e.target.dataset && e.target.dataset.check)) {
+      values[caseId] = values[caseId] || {}; values[caseId][e.target.id.slice(2)] = e.target.value.trim();
+      if ($('epwrap')) $('epwrap').innerHTML = epList(); // placeholders follow Rate, boxes lock with Ladder steps
+      update();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.dataset && e.target.dataset.check && e.target.id.indexOf('f_') === 0) { values[caseId] = values[caseId] || {}; values[caseId][e.target.id.slice(2)] = e.target.checked ? '1' : '0'; update(); return; }
+    if (e.target.tagName === 'SELECT' && e.target.id.indexOf('f_') === 0) { values[caseId] = values[caseId] || {}; values[caseId][e.target.id.slice(2)] = e.target.value; if (e.target.id === 'f_PERF_ENDPOINT') renderForm(); update(); } });
+  $('runBtn').onclick = run;
+  $('stopBtn').onclick = function () { api('/api/stop', {}).catch(function (x) { $('err').textContent = x.message; }); };
+  $('exitView').onclick = exitView;
+
+  applyStatic(); $('cardTitle').textContent = t('Latest run');
+  api('/api/meta').then(function (m) {
+    META = m; if (META.cases[location.hash.slice(1)]) caseId = location.hash.slice(1);
+    $('real').checked = !!META.cases[caseId].steady;
+    renderTargets(); renderTabs(); renderForm(); update(); loadHistory(); poll(); loadLastPass();
+    prepPoll(); // a prepare started earlier (or from another tab) keeps showing its log
+  })
+    .catch(function (x) { $('err').textContent = t('runner not reachable: ') + x.message; });
+})();
+</script>
+</body>
+</html>

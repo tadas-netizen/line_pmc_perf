@@ -1,0 +1,10 @@
+/.env
+/.env.*
+!/.env.example
+/data/*
+!/data/.gitkeep
+/results/*
+!/results/.gitkeep
+node_modules/
+__pycache__/
+.DS_Store
