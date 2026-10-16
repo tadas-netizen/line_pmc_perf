@@ -550,6 +550,8 @@ details.calc{margin:0}details.calc summary{font-size:13px;color:var(--accent);fo
   }
   function envNow() {
     var e = {}; fieldsOf(caseId).forEach(function (f) { var v = val(f.key); if (v !== '' && v != null) e[f.key] = v; });
+    ['PERF_PARTNER', 'PERF_PARTNERS'].forEach(function (k) { if (e[k]) e[k] = e[k].split(',').map(function (x) { return x.trim().toUpperCase(); }).filter(Boolean).join(','); });
+    if (e.PERF_PARTNER && e.PERF_PARTNER.indexOf(',') >= 0) { if (!e.PERF_PARTNERS) e.PERF_PARTNERS = e.PERF_PARTNER; e.PERF_PARTNER = e.PERF_PARTNER.split(',')[0]; }
     if (isList()) { e.ENDPOINTS = pickList().join(','); if (!e.ENDPOINTS) delete e.ENDPOINTS; if (!e.TS01_RATES) delete e.TS01_RATES; }
     return e;
   }

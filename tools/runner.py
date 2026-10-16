@@ -409,10 +409,10 @@ CASES = {
 }
 PARTNER = [
     F("PERF_PARTNER", "Partner", "", "the first partner with an orderable product",
-      "the one partner code used where a single code is needed",
+      "one code; a list here (P01, P02) is taken as Partners (storefront) with P01 as the single one",
       "The partner code used where one is needed: GET /api/admin/products?partner=, the discount-code fixtures, the scoped ?partner= when the admin role is partner, the image uploads. Empty = the first partner with an active, in-stock product in GET /api/products."),
     F("PERF_PARTNERS", "Partners (storefront)", "", "every partner with an orderable product",
-      "comma list of partner codes the storefront calls spread over",
+      "comma list the storefront calls spread over, e.g. P01, P02 (spaces are fine)",
       "Limits the storefront calls (GET /api/products?partner=, POST /api/discount/validate, POST /api/orders — TS-02, the mix, the TS-01 public entries) to these partner codes, comma-separated. Empty = every partner that has an active, in-stock product. One partner = one order counter = a contention test."),
 ]
 for _c in CASES.values():
@@ -1063,6 +1063,8 @@ def start_run(body):
             continue
         if k not in allowed:
             raise ValueError(f"{case} does not take {k}")
+        if k in ("PERF_PARTNER", "PERF_PARTNERS"):
+            v = re.sub(r"\s*,\s*", ",", v).strip()
         if not (LONG_VALUE_RE if k in LONG_KEYS else VALUE_RE).match(v):
             raise ValueError(f"{k}: characters not allowed")
         env[k] = v
@@ -1084,11 +1086,17 @@ def start_run(body):
     for k in ("TSALL_TS01_TPS", "TSALL_TS01_AUTH_TPS", "TSALL_TS01_WRITE_TPS", "PERF_RPS", "PERF_ORDERS_PER_SEC", "PERF_TARGET_RPS", "PERF_STRESS_MAX", "PERF_STRESS_STEP", "PERF_SPIKE_RPS", "PERF_LOGINS_PER_SEC"):
         if env.get(k) and (not re.match(r"^\d+$", env[k]) or int(env[k]) <= 0):
             raise ValueError(f"{k}: a whole number of TPS, e.g. 50")
+    # partner codes: "P01, P02" → "P01,P02" (spaces around commas dropped, upper-cased); a list typed into
+    # the single-partner box becomes PERF_PARTNERS (unless set) with its first code as PERF_PARTNER
     for k in ("PERF_PARTNER", "PERF_PARTNERS"):
-        if env.get(k) and not re.match(r"^[A-Za-z0-9_-]{1,40}(,[A-Za-z0-9_-]{1,40})*$", env[k]):
-            raise ValueError(f"{k}: partner codes (A-Z 0-9 _ -), comma-separated")
+        if env.get(k):
+            codes = [c.strip().upper() for c in env[k].split(",") if c.strip()]
+            if not codes or any(not re.match(r"^[A-Z0-9_-]{1,40}$", c) for c in codes):
+                raise ValueError(f"{k}: partner codes (A-Z 0-9 _ -), comma-separated, e.g. P01, P02")
+            env[k] = ",".join(codes)
     if env.get("PERF_PARTNER") and "," in env["PERF_PARTNER"]:
-        raise ValueError("PERF_PARTNER: one code (PERF_PARTNERS takes the list)")
+        env.setdefault("PERF_PARTNERS", env["PERF_PARTNER"])
+        env["PERF_PARTNER"] = env["PERF_PARTNER"].split(",")[0]
     for k in ("PERF_P_VALIDATE", "PERF_P_SLIP", "PERF_P_NOTE", "PERF_P_STATUS", "PERF_P_RANGE"):
         if env.get(k) and not re.match(r"^(0(\.\d+)?|1(\.0+)?)$", env[k]):
             raise ValueError(f"{k}: a probability 0–1, e.g. 0.3")
